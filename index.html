@@ -18,30 +18,105 @@
         display: flex; flex-direction: column; align-items: center; justify-content: center; 
         transition: opacity 0.4s ease-out, visibility 0.4s ease-out;">
 
+        <div id="ly-splash-screen" style="
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+        background-color: #f8f9fa; z-index: 9999999; 
+        display: flex; flex-direction: column; align-items: center; justify-content: center; 
+        transition: opacity 0.4s ease-out, visibility 0.4s ease-out;">
+
         <div
-            style="font-size: 2.2rem; font-weight: bold; color: var(--blue-primary, #0d6efd); letter-spacing: 6px; margin-bottom: 20px; text-shadow: 0 2px 4px rgba(0,0,0,0.1); animation: pulse 1.5s infinite;">
+            style="font-size: 3rem; font-weight: bold; color: var(--blue-primary, #0d6efd); letter-spacing: 6px; margin-bottom: 100px; text-shadow: 0 2px 4px rgba(0,0,0,0.1); animation: pulse 1.5s infinite;">
             六爻排盤</div>
 
         <div
             style="position: relative; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
             <div class="splash-spinner" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></div>
             <div class="splash-taichi">☯</div>
+            <div id="bagua-ring" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></div>
         </div>
-        <div class="ly-mystic-text" style="margin-top: 15px; font-size: 0.9rem; color: #666; letter-spacing: 2px;">
-    道法感應中<span class="ly-dot1">.</span><span class="ly-dot2">.</span><span class="ly-dot3">.</span>
-</div>
+
+        <div class="ly-mystic-text" style="margin-top: 100px; font-size: 1.5rem; color: #666; letter-spacing: 2px;">
+            <span class="ly-dot3">.</span><span class="ly-dot2">.</span><span class="ly-dot1">.</span>道法感應中<span class="ly-dot1">.</span><span class="ly-dot2">.</span><span class="ly-dot3">.</span>
+        </div>
         <script>
-            (function() {
-                let spinner = document.querySelector('.splash-spinner');
-                if (spinner) {
-                    // 隨機產生 0 到 3 之間的秒數 (因為彩虹動畫全長 3 秒)
-                    let randomTime = (Math.random() * 3).toFixed(2);
-                    
-                    // 設定動畫延遲：第一個 0s 給旋轉動畫，第二個負秒數給彩虹變色動畫
-                    // 負數會讓動畫一開始就「快轉」到該秒數的顏色！
-                    spinner.style.animationDelay = `0s, -${randomTime}s`;
-                }
-            })();
+            document.addEventListener('DOMContentLoaded', () => {
+                // 給瀏覽器 100 毫秒的喘息空間，讓它先專心把底層系統與太極畫好
+                setTimeout(() => {
+                    // requestAnimationFrame 保證在螢幕準備好更新下一張畫面的瞬間才執行，達到 60fps 的極致順滑
+                    requestAnimationFrame(() => {
+                        
+                        // ==========================================
+                        // 1. 彩虹延遲魔法
+                        // ==========================================
+                        let spinner = document.querySelector('.splash-spinner');
+                        if (spinner) {
+                            let randomTime = (Math.random() * 3).toFixed(2);
+                            spinner.style.animationDelay = `0s, -${randomTime}s`;
+                        }
+
+                        // ==========================================
+                        // 2. 隨機八卦佈陣魔法
+                        // ==========================================
+                        let ring = document.getElementById('bagua-ring');
+                        if (ring) {
+                            const C_METAL = '#e6a23c'; 
+                            const C_WOOD  = '#198754'; 
+                            const C_WATER = '#0d6efd'; 
+                            const C_FIRE  = '#dc3545'; 
+                            const C_EARTH = '#8B4513'; 
+
+                            const earlyHeaven = [
+                                { char: '☰', order: 1, color: C_METAL }, 
+                                { char: '☴', order: 5, color: C_WOOD  }, 
+                                { char: '☵', order: 6, color: C_WATER }, 
+                                { char: '☶', order: 7, color: C_EARTH }, 
+                                { char: '☷', order: 8, color: C_EARTH }, 
+                                { char: '☳', order: 4, color: C_WOOD  }, 
+                                { char: '☲', order: 3, color: C_FIRE  }, 
+                                { char: '☱', order: 2, color: C_METAL }  
+                            ];
+                            
+                            const laterHeaven = [
+                                { char: '☲', order: 3, color: C_FIRE  }, 
+                                { char: '☷', order: 4, color: C_EARTH }, 
+                                { char: '☱', order: 5, color: C_METAL }, 
+                                { char: '☰', order: 6, color: C_METAL }, 
+                                { char: '☵', order: 7, color: C_WATER }, 
+                                { char: '☶', order: 8, color: C_EARTH }, 
+                                { char: '☳', order: 1, color: C_WOOD  }, 
+                                { char: '☴', order: 2, color: C_WOOD  }  
+                            ];
+
+                            const isEarly = Math.random() > 0.5;
+                            const currentBagua = isEarly ? earlyHeaven : laterHeaven;
+                            const radius = 85; 
+
+                            let fragment = document.createDocumentFragment();
+
+                            currentBagua.forEach((gua, index) => {
+                                let el = document.createElement('div');
+                                el.className = 'bagua-gua';
+                                el.innerText = gua.char;
+                                
+                                let angle = (index * 45) - 90; 
+                                let rad = angle * Math.PI / 180;
+                                let x = Math.cos(rad) * radius;
+                                let y = Math.sin(rad) * radius;
+
+                                el.style.setProperty('--tx', `${x}px`);
+                                el.style.setProperty('--ty', `${y}px`);
+                                el.style.setProperty('--gua-color', gua.color);
+                                
+                                el.style.animationDelay = `${gua.order * 0.12}s`;
+                                
+                                fragment.appendChild(el);
+                            });
+                            
+                            ring.appendChild(fragment);
+                        }
+                    });
+                }, 100); // 100 毫秒的黃金緩衝時間
+            });
         </script>
     </div>
     <!-- ★ 修改模式的半透明黑底 -->
