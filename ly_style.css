@@ -1,0 +1,857 @@
+/* ==========================================
+   ★ 1. 全域變數與基礎設定 (Reset & Base)
+========================================== */
+:root {
+    --bg: #fff;
+    --text: #333;
+    --blue-primary: #007bff;
+    --blue-light: #e7f1ff;
+    --border: #ced4da;
+    --red: #dc3545;
+    --green: #198754;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+/* 全站字型強制切換為標楷體 (包含各平台的楷體備用字型) */
+body, button, select, input, textarea, div, span, text {
+    font-family: "標楷體", "BiauKai", "DFKai-SB", "Kaiti TC", "KaiTi", "楷体", serif !important;
+}
+
+body {
+    background-color: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ==========================================
+   ★ 2. 佈局與排版通用 Class (Utils)
+========================================== */
+.flex-center { display: flex; justify-content: center; align-items: center; }
+.flex-col-center { display: flex; flex-direction: column; align-items: center; }
+.gap-6 { gap: 6px; }
+.gap-8 { gap: 8px; }
+.gap-10 { gap: 10px; }
+.text-center { text-align: center; }
+.text-gray { color: #555; }
+.w-100 { width: 100%; }
+
+/* --- 全域五行配色 --- */
+.c-gold { color: #e6a23c !important; }
+.c-wood { color: #198754 !important; }
+.c-water { color: #0d6efd !important; }
+.c-fire { color: #dc3545 !important; }
+.c-earth { color: #8B4513 !important; }
+
+/* ==========================================
+   ★ 3. 入口與共用 UI 元件 (Buttons, Inputs)
+========================================== */
+.portal-container {
+    padding: 10px;
+    background: #f8f9fa;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.portal-header {
+    text-align: center;
+    color: var(--blue-primary);
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.master-switch-area {
+    text-align: center;
+    margin-bottom: 10px;
+    font-weight: bold;
+    color: #555;
+    white-space: nowrap;
+    overflow-x: auto;
+    padding-bottom: 5px;
+}
+
+.master-checkbox {
+    transform: scale(1.2);
+    margin-right: 5px;
+    cursor: pointer;
+}
+
+#date-setting-panel {
+    display: none;
+    margin-top: 10px;
+    border: 1px solid #e0e0e0;
+    padding: 10px;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.switch-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 15px;
+}
+
+.switch-btn {
+    padding: 6px 20px;
+    border: 1px solid var(--blue-primary);
+    cursor: pointer;
+    font-family: monospace;
+    font-size: 15px;
+    transition: all 0.2s;
+    text-transform: uppercase;
+}
+
+.switch-btn:first-child { border-radius: 4px 0 0 4px; border-right: none; }
+.switch-btn:last-child { border-radius: 0 4px 4px 0; }
+.switch-active { background-color: var(--blue-primary); color: white; }
+.switch-inactive { background-color: #fff; color: var(--blue-primary); }
+
+#mode-true, #mode-false { display: none; }
+
+.row-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.input-wrapper {
+    flex: 1;
+    min-width: 100px;
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0 5px;
+    background: #fff;
+    height: 38px;
+}
+
+.input-wrapper label {
+    margin-right: 5px;
+    color: #666;
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.input-wrapper select,
+.input-wrapper input {
+    border: none;
+    outline: none;
+    width: 100%;
+    font-size: 14px;
+    background: transparent;
+}
+
+.unit {
+    color: #666;
+    font-size: 0.9em;
+    padding-left: 5px;
+    white-space: nowrap;
+}
+
+/* 干支選擇器 */
+.ganzhi-grid { display: flex; gap: 10px; justify-content: space-between; text-align: center; }
+.ganzhi-col { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.ganzhi-label { font-size: 1.1em; color: #666; font-weight: bold; margin-bottom: 2px; }
+.gz-select-group { display: flex; flex-direction: column; gap: 5px; }
+.gz-sel {
+    width: 100%;
+    padding: 8px 2px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 1.1em;
+    text-align: center;
+    color: var(--blue-primary);
+    font-weight: bold;
+    background: #fff;
+}
+
+/* ==========================================
+   ★ 首頁主按鈕群組 (保證上下兩排 100% 絕對對稱)
+========================================== */
+/* 1. 按鈕外層容器 (統一間距與排版) */
+.top-action-group, 
+.btn-row {
+    display: flex; 
+    gap: 8px; /* 上下兩排的按鈕間距統一為 8px */
+    width: 100%;
+    margin-bottom: 12px;
+}
+
+/* 2. 首頁主按鈕群組 (六顆按鈕字體完美自適應) */
+.top-action-btn,
+.btn-p {
+    flex: 1;
+    min-width: 0; 
+    padding: 12px 2px !important; 
+    
+    /* ★ 核心魔法：大幅提高 vw 的比例 (4.5vw)，讓字體隨按鈕大小積極放大！ */
+    /* 最小 0.75rem 保底，最大可以長到 1.25rem 的霸氣尺寸 */
+    font-size: clamp(0.75rem, 4.5vw, 1.25rem) !important; 
+    
+    white-space: nowrap;     /* 絕對不換行 */
+    overflow: hidden;        /* 超出按鈕範圍時隱藏，保護按鈕形狀 */
+    text-overflow: ellipsis; /* 若在極小螢幕塞不下，顯示... 避免破版 */
+    letter-spacing: -0.5px;  /* 稍微縮減字距，讓按鈕塞得下更多字 */
+    
+    text-align: center;
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15); 
+    color: #fff; 
+}
+
+/* 3. 按鈕顏色獨立設定 */
+.btn-blue { background-color: var(--blue-primary); }
+.btn-green { background-color: var(--green); }
+
+/* ==========================================
+   ★ 系統通用功能按鈕 (設定頁面、匯出匯入用)
+========================================== */
+.action-btn {
+    background: #17a2b8;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 1rem;
+    display: block;
+    width: 100%;
+    font-weight: bold;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* ==========================================
+   ★ 表單與輸入框共用樣式 (設定視窗內使用)
+========================================== */
+.form-row {
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #f9f9f9;
+    padding-bottom: 5px;
+}
+
+.label-box { width: 90px; font-weight: bold; color: #333; }
+.input-content { flex: 1; }
+
+select.full-width, input[type="text"] {
+    width: 100%; 
+    padding: 8px; 
+    border: 1px solid #ccc; 
+    font-size: 1rem; 
+    border-radius: 3px; 
+    background: #fff;
+}
+
+/* 提示訊息防爆 */
+#portal-msg, #modal-msg {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;
+    font-size: clamp(0.7rem, 3.5vw, 0.95rem) !important; letter-spacing: -0.5px;
+}
+
+/* ==========================================
+   ★ 4. 彈出視窗與提示框 (Modals & Toasts)
+========================================== */
+/* 修改模式的半透明黑底 */
+#edit-backdrop {
+    display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.6); z-index:9998; backdrop-filter: blur(3px);
+}
+
+.edit-modal-mode {
+    position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important;
+    width: 92% !important; max-width: 500px !important; max-height: 90vh !important; overflow-y: auto !important; z-index: 9999 !important;
+}
+
+/* ★ 整合後的主系統視窗黑底 */
+.modal-overlay, .ly-modal-overlay {
+    display: none; /* JS 開啟時請改為 flex */
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100dvh;
+    background: rgba(0, 0, 0, 0.65);
+    z-index: 100000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.2s ease-out; /* 純透明度淡入 */
+}
+
+/* ★ 整合後的主系統視窗主體 */
+.modal-content, .ly-modal-box {
+    background: #fff;
+    border-radius: 8px;
+    width: 95%;
+    max-width: 450px;
+    max-height: 90dvh;
+    overflow-y: auto;
+    padding: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    position: relative;
+    overscroll-behavior: contain; /* 防止滑動穿透 */
+    animation: popUp 0.2s ease-out forwards; /* 縮放並浮出 */
+}
+
+.ly-modal-box { text-align: center; padding: 20px; max-width: 320px; }
+
+/* 視窗內的捲軸美化 */
+.modal-content::-webkit-scrollbar { width: 6px; }
+.modal-content::-webkit-scrollbar-track { background: transparent; }
+.modal-content::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,0.2); border-radius: 10px; }
+
+.ly-modal-msg { font-size: 1.05rem; color: #333; margin-bottom: 20px; line-height: 1.5; font-weight: bold; }
+.ly-modal-btns { display: flex; gap: 10px; justify-content: center; }
+.ly-btn-ok { flex: 1; background: var(--blue-primary); color: #fff; border: none; padding: 10px; border-radius: 6px; font-size: 1rem; font-weight: bold; cursor: pointer; }
+.ly-btn-cancel { flex: 1; background: #e0e0e0; color: #555; border: none; padding: 10px; border-radius: 6px; font-size: 1rem; font-weight: bold; cursor: pointer; }
+
+/* 浮動提示條 (自適應單行、防破版) */
+.toast-msg {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 25px;
+    z-index: 20000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    animation: fadeInOut 2.5s forwards;
+    
+    /* ★ 核心魔法：自適應縮放與單行限制 */
+    font-size: clamp(0.75rem, 3.5vw, 0.95rem); /* 字體隨螢幕動態縮放 */
+    white-space: nowrap;                       /* 強制絕對不換行 */
+    max-width: 90vw;                           /* 限制最寬只能佔螢幕的 90%，避免左右貼壁 */
+    overflow: hidden;                          /* 萬一字真的超級多，超出的部分隱藏 */
+    text-overflow: ellipsis;                   /* 隱藏的部分用 ... 代替 */
+}
+
+/* ==========================================
+   ★ 5. 排盤結果頁 (Result View)
+========================================== */
+#result-view {
+    display: none; padding: 5px; background: #fff; flex: 1; overflow-y: auto; flex-direction: column; position: relative;
+}
+
+.nav-bar {
+    background: #eee; padding: 4px 8px; display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid #ccc; flex-shrink: 0;
+}
+.nav-bar button { padding: 3px 10px !important; font-size: 0.9em !important; }
+.nav-bar div[style*="line-height"] { line-height: 24px !important; }
+
+/* 導覽列置頂 */
+#result-view .nav-bar { background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+.result-settings-bar {
+    background: #f8f9fa; padding: 6px 8px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+    border-bottom: 1px solid #ddd; font-size: 0.85em; flex-shrink: 0;
+}
+.result-settings-bar .rs-item { display: flex; align-items: center; gap: 4px; }
+.result-settings-bar select { border: 1px solid #bbb; border-radius: 3px; padding: 2px; font-size: 0.95em; background: #fff; outline: none; }
+@media (min-width: 769px) { .result-settings-bar { display: none !important; } }
+
+.classic-header {
+    display: flex; flex-direction: row; justify-content: space-between; align-items: flex-start;
+    border: 1px solid #000; padding: 5px; margin-top: 5px; margin-bottom: 5px; flex-shrink: 0;
+}
+.classic-info { flex: 1; min-width: 150px; font-size: 15px; line-height: 1.6; padding-right: 5px; }
+.right-header-group { display: flex; gap: 10px; }
+
+.bazi-box { display: flex; gap: 4px; text-align: center; }
+.bazi-col { display: flex; flex-direction: column; border: 1px solid #eee; padding: 2px; width: 26px; background: #fff; }
+.bz-title { font-size: 0.85em; margin-bottom: 2px; color: #000; }
+.bz-v { color: var(--red); font-weight: bold; font-size: 1.2em; writing-mode: vertical-lr; letter-spacing: 3px; margin: auto 0; }
+.bz-v span { display: inline-block; padding: 1px 0; }
+
+.ss-table { border-collapse: collapse; font-size: 13px; text-align: center; margin-left: 5px; }
+.ss-table td { padding: 0 3px; vertical-align: top; }
+.ss-l { display: flex; flex-direction: column; align-items: center; line-height: 1.1; margin-bottom: 4px; color: #555; }
+.ss-v { display: flex; flex-direction: column; align-items: center; color: var(--red); font-weight: bold; font-size: 1.1em; gap: 1px; }
+
+/* ★ 卦盤主表格 ★ */
+.gua-table { width: 100%; border-collapse: collapse; margin-top: 0px !important; font-size: 16px; table-layout: fixed; flex-shrink: 0; }
+.gua-table th { font-weight: bold; padding: 5px; border-bottom: 1px solid #000; text-align: center; font-size: 0.95em; }
+.gua-table td { padding: 4px 0; height: 34px; vertical-align: middle; text-align: center; position: relative; }
+
+.gz-text { font-weight: bold; position: relative; display: inline-block; }
+.yao-visual { display: inline-block; width: 45px; height: 12px; vertical-align: middle; margin: 0 5px; position: relative; }
+.y-solid { background-color: #000 !important; width: 100%; height: 100%; display: block; border: 1px solid #000; }
+.y-broken { width: 100%; height: 100%; display: flex; justify-content: space-between; }
+.y-broken span { background-color: #000 !important; width: 18px; height: 100%; display: block; border: 1px solid #000; }
+
+.marker-shi, .marker-ying { color: var(--red); font-weight: bold; font-size: 0.9em; margin-right: 2px; }
+.move-arrow { color: var(--red); font-family: monospace; font-weight: bold; font-size: 1.1em; position: relative; padding: 0 !important; }
+.bian-container { display: flex; align-items: center; justify-content: flex-start; padding-left: 10px; white-space: nowrap; overflow: hidden; }
+
+.hint-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.95rem; border: 1px solid #555; flex-shrink: 0; }
+.hint-table th, .hint-table td { border: 1px solid #999; padding: 6px; text-align: center; vertical-align: middle; }
+.hint-table th { background: #f0f0f0; width: 25%; font-weight: bold; color: #333; }
+.hint-table td { background: #fff; color: #000; font-weight: bold; }
+.hint-table .ht-none { color: #999; font-weight: normal; font-size: 0.9em; }
+
+/* ==========================================
+   ★ 6. 卦名、標籤與高級特效
+========================================== */
+.gong-badge { border: 1px solid #333; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; margin-right: 6px; }
+.gua-title-text { font-size: 1.1em; }
+.gua-prop-text { color: var(--red); font-size: 0.9em; font-weight: bold; margin-left: 4px; }
+#res-gong-title > div { margin-bottom: 0px !important; }
+
+.desk-gong-row { display: flex; width: 100%; align-items: center; margin-bottom: 5px; }
+.col-22 { width: 22%; }
+.col-35 { width: 35%; display: flex; justify-content: center; align-items: center; }
+.col-8 { width: 8%; display: flex; justify-content: center; align-items: center; }
+.col-rel { width: 45px !important; min-width: 45px !important; max-width: 45px !important; white-space: nowrap; overflow: hidden; }
+.col-fu { width: 65px !important; min-width: 65px !important; padding-left: 2px !important; padding-right: 2px !important; white-space: nowrap; overflow: hidden; }
+
+.fu-rel-text { font-size: 0.85em; color: #666; }
+.desk-yao-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+/* 2x2 網格化干支方塊 */
+.gz-block {
+    display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto;
+    column-gap: 4px; row-gap: 2px; align-items: start; text-align: left; line-height: 1.1; min-width: 60px;
+}
+.gz-zhi { grid-column: 1; grid-row: 1; font-size: 1.1em; font-weight: bold; line-height: 1; }
+.gz-gan { grid-column: 2; grid-row: 1; font-size: 0.85em; color: #666; padding-top: 3px; line-height: 1; }
+.gz-wx { grid-column: 1; grid-row: 2; font-size: 1.1em; font-weight: bold; line-height: 1; }
+.gz-tags { grid-column: 2; grid-row: 2; display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+.gz-tags span { font-size: 0.7em !important; padding: 1px 3px !important; border-radius: 2px; white-space: nowrap; line-height: 1.1; box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.15); margin: 0 !important; }
+
+/* 橫屏發動爻與長箭頭排版 */
+.desk-move-box { position: absolute; top: 50%; left: -10px; transform: translateY(-50%); display: flex; align-items: center; width: calc(100% + 15px); z-index: 10; }
+.desk-move-mark { color: var(--red); font-weight: bold; margin-right: 4px; font-size: 1.1em; }
+.desk-long-arrow { flex-grow: 1; height: 2px; background-color: #888; position: relative; min-width: 15px; }
+.desk-long-arrow::after { content: ''; position: absolute; right: -2px; top: -4px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 6px solid #888; }
+
+/* 小印章特效 */
+.yin-seal {
+    font-family: "標楷體", "BiauKai", "DFKai-SB", serif; padding: 3px 5px; border-radius: 4px; font-weight: bold; letter-spacing: 1px; display: inline-block; font-size: 0.95em; text-align: center;
+    border: 1px solid rgba(0, 0, 0, 0.3); box-shadow: inset 1px 1px 4px rgba(0, 0, 0, 0.6), inset -1px -1px 2px rgba(255, 255, 255, 0.2);
+}
+.seal-sy { background-color: #dc3545; color: #fff; text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.5); }
+.seal-oy { background-color: #ffc107; color: #222; text-shadow: 1px 1px 0px rgba(255, 255, 255, 0.6); }
+.seal-sn { background-color: #e0e0e0; color: #333; text-shadow: 1px 1px 0px rgba(255, 255, 255, 0.8); }
+.seal-on { background-color: #6c757d; color: #fff; text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.5); }
+.yin-seal-ghost {
+    font-family: "標楷體", "BiauKai", "DFKai-SB", serif; padding: 5px 15px; border-radius: 4px; display: inline-block; font-size: 1.1rem; color: rgba(255, 255, 255, 0.4);
+    background: rgba(128, 128, 128, 0.2); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: inset 1px 1px 4px rgba(0, 0, 0, 0.5); margin-top: 20px; letter-spacing: 2px;
+}
+.mark-kong { background: #ffc107; color: #333; font-size: 0.6rem; padding: 1px 2px; border-radius: 2px; display: inline-block; vertical-align: middle; margin-left: 2px; }
+.mark-break { background: #dc3545; color: #fff; font-size: 0.6rem; padding: 1px 2px; border-radius: 2px; display: inline-block; vertical-align: middle; margin-left: 2px; }
+
+/* 關係線過濾條 */
+.filter-bar { display: flex; justify-content: flex-start; gap: 4px; margin: 5px 0 2px 0; padding: 2px; flex-wrap: nowrap !important; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.filter-bar::-webkit-scrollbar { display: none; }
+.filter-bar .seal-btn { padding: 2px 6px !important; font-size: clamp(0.75em, 3vw, 1em) !important; white-space: nowrap; flex-shrink: 0; }
+
+.seal-btn {
+    font-family: "標楷體", "BiauKai", "DFKai-SB", serif; font-size: 1.1em; font-weight: bold; background-color: #fff; border-width: 2px; border-style: solid; border-radius: 4px; padding: 4px 12px; cursor: pointer; transition: all 0.2s ease;
+}
+.seal-btn:hover:not(.active) { transform: translate(-1px, -1px); }
+.seal-btn.active { color: #fff; box-shadow: inset 1px 1px 4px rgba(0, 0, 0, 0.5); transform: translate(1px, 1px); }
+
+/* 過濾按鈕顏色設定 */
+.btn-ming { border-color: #fd7e14; color: #fd7e14; box-shadow: 2px 2px 0px rgba(253, 126, 20, 0.25); }
+.btn-ming:hover:not(.active) { background-color: #fff4ec; box-shadow: 3px 3px 0px rgba(253, 126, 20, 0.25); }
+.btn-ming.active { background-color: #fd7e14; color: #fff; }
+.btn-all { border-color: #343a40; color: #343a40; box-shadow: 2px 2px 0px rgba(52, 58, 64, 0.25); }
+.btn-all:hover:not(.active) { background-color: #f8f9fa; box-shadow: 3px 3px 0px rgba(52, 58, 64, 0.25); }
+.btn-all.active { background-color: #343a40; }
+.btn-none { border-color: #6c757d; color: #6c757d; box-shadow: 2px 2px 0px rgba(108, 117, 125, 0.25); }
+.btn-none:hover:not(.active) { background-color: #f8f9fa; box-shadow: 3px 3px 0px rgba(108, 117, 125, 0.25); }
+.btn-none.active { background-color: #6c757d; }
+.btn-sheng { border-color: #198754; color: #198754; box-shadow: 2px 2px 0px rgba(25, 135, 84, 0.25); }
+.btn-sheng:hover:not(.active) { background-color: #e8f5e9; box-shadow: 3px 3px 0px rgba(25, 135, 84, 0.25); }
+.btn-sheng.active { background-color: #198754; }
+.btn-ke { border-color: #dc3545; color: #dc3545; box-shadow: 2px 2px 0px rgba(220, 53, 69, 0.25); }
+.btn-ke:hover:not(.active) { background-color: #fff5f5; box-shadow: 3px 3px 0px rgba(220, 53, 69, 0.25); }
+.btn-ke.active { background-color: #dc3545; }
+.btn-chong { border-color: #6f42c1; color: #6f42c1; box-shadow: 2px 2px 0px rgba(111, 66, 193, 0.25); }
+.btn-chong:hover:not(.active) { background-color: #f3e5f5; box-shadow: 3px 3px 0px rgba(111, 66, 193, 0.25); }
+.btn-chong.active { background-color: #6f42c1; }
+.btn-he { border-color: #0d6efd; color: #0d6efd; box-shadow: 2px 2px 0px rgba(13, 110, 253, 0.25); }
+.btn-he:hover:not(.active) { background-color: #e7f1ff; box-shadow: 3px 3px 0px rgba(13, 110, 253, 0.25); }
+.btn-he.active { background-color: #0d6efd; }
+.btn-mu { border-color: #8B4513; color: #8B4513; box-shadow: 2px 2px 0px rgba(139, 69, 19, 0.25); }
+.btn-mu:hover:not(.active) { background-color: #fdf8f5; box-shadow: 3px 3px 0px rgba(139, 69, 19, 0.25); }
+.btn-mu.active { background-color: #8B4513; }
+.btn-bi { border-color: #17a2b8; color: #17a2b8; box-shadow: 2px 2px 0px rgba(23, 162, 184, 0.25); }
+.btn-bi:hover:not(.active) { background-color: #e0f7fa; box-shadow: 3px 3px 0px rgba(23, 162, 184, 0.25); }
+.btn-bi.active { background-color: #17a2b8; }
+.btn-all-plus { border-color: #d4af37; color: #d4af37; box-shadow: 2px 2px 0px rgba(212, 175, 55, 0.25); }
+.btn-all-plus:hover:not(.active) { background-color: #fffdf5; box-shadow: 3px 3px 0px rgba(212, 175, 55, 0.25); }
+.btn-all-plus.active { background-color: #d4af37; color: #fff; }
+.btn-all-plus sup { font-size: 0.8em; font-weight: 900; }
+.btn-xingmu { border-color: #A0522D; color: #A0522D; box-shadow: 2px 2px 0px rgba(160, 82, 45, 0.25); }
+.btn-xingmu:hover:not(.active) { background-color: #fdf8f5; box-shadow: 3px 3px 0px rgba(160, 82, 45, 0.25); }
+.btn-xingmu.active { background-color: #A0522D; color: #fff; }
+
+/* ★ 互動畫布與高亮系統 */
+.clickable-yao { cursor: pointer; position: relative; z-index: 1001; transition: all 0.2s ease; border: 1px dashed transparent; }
+.clickable-yao:hover { background: #f0f8ff; border-color: #0d6efd; border-radius: 4px; box-shadow: 0 0 5px rgba(13, 110, 253, 0.3); }
+.yao-highlight { background: #e7f1ff; border-radius: 4px; border: 1px solid #0d6efd; box-shadow: 0 0 8px rgba(13, 110, 253, 0.6); }
+.rel-label { font-size: 13px; font-weight: bold; text-anchor: middle; }
+.rel-label-bg { font-size: 13px; font-weight: bold; text-anchor: middle; stroke: #fff; stroke-width: 4px; stroke-linejoin: round; }
+.same-zhi-highlight { outline: 2px solid #000; outline-offset: 1px; border-radius: 2px; animation: zhiGlow 1.5s infinite; position: relative; z-index: 1002; font-weight: 900; color: #000 !important; }
+.year-he-highlight { outline: 2px solid #0d6efd; outline-offset: 1px; background-color: #e7f1ff !important; border-radius: 2px; transition: all 0.2s ease; position: relative; z-index: 1002; }
+.bi-highlight { outline: 2px dashed #17a2b8; outline-offset: 1px; border-radius: 2px; background-color: #e0f7fa !important; position: relative; z-index: 1002; font-weight: bold; }
+.zhi-char { display: inline-block; padding: 0 1px; position: relative; }
+.sanhe-marker { position: relative !important; }
+.sanhe-red::after { content: '▲'; color: #dc3545; position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 11px; z-index: 1005; text-shadow: 0 0 2px #fff, 0 0 2px #fff; }
+.sanhe-black::after { content: '▲'; color: #000; position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 11px; z-index: 1005; text-shadow: 0 0 2px #fff, 0 0 2px #fff; }
+
+/* 雜項元件 */
+.mini-sel { border: 1px solid #bbb; border-radius: 4px; padding: 3px 2px; font-size: 0.85em; background: #f8f9fa; color: #333; outline: none; font-family: inherit; font-weight: bold; }
+.yao-select-centered { text-align: center; text-align-last: center; }
+.yao-select-centered option { text-align: center; }
+.yao-row-container { display: flex; align-items: center; gap: 6px; width: 100%; }
+.ritual-prompt { font-size: 1.1rem; color: #ffeb3b; margin-top: 15px; background: rgba(255, 255, 255, 0.1); padding: 8px 20px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.2); animation: pulse 2s infinite; }
+.anim-emoji { font-size: 5rem; text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); }
+.anim-text-seal { font-size: 3.5rem; background-color: var(--red); color: white; padding: 15px 30px; border-radius: 8px; font-weight: bold; letter-spacing: 10px; box-shadow: inset 3px 3px 8px rgba(0, 0, 0, 0.5), 0 0 20px rgba(220, 53, 69, 0.6); }
+
+/* ==========================================
+   ★ 摺疊面板：動態箭頭與專屬佈局 (統一管理)
+========================================== */
+
+/* 1. 統一所有摺疊面板的「收合狀態」箭頭 (向下) */
+.adv-settings-summary::after,
+.notes-summary::after,
+.settings-summary::after { 
+    content: "▼"; 
+    font-size: 0.8em; 
+    color: #666; 
+    margin-left: auto; 
+}
+
+/* 2. 統一所有摺疊面板的「展開狀態」箭頭 (向上) */
+details[open] .adv-settings-summary::after,
+details[open] .notes-summary::after,
+details[open] .settings-summary::after { 
+    content: "▲"; 
+}
+
+/* 3. 保留筆記區塊專屬的容器與背景樣式 */
+.notes-section { 
+    margin-top: 20px; 
+    border: 1px solid #ddd; 
+    border-radius: 6px; 
+    overflow: hidden; 
+    flex-shrink: 0; 
+}
+.notes-summary { 
+    background: #f1f3f5; 
+    padding: 10px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    list-style: none; 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+}
+
+/* ==========================================
+   ★ 設定頁籤標題 (自適應縮放、絕對不換行)
+========================================== */
+.settings-summary {
+    /* 強制覆蓋 HTML 內的固定字體，改用彈性字體 (最小0.9rem，隨螢幕4.5vw快速放大，最大1.2rem) */
+    font-size: clamp(0.9rem, 4.5vw, 1.2rem) !important;
+    
+    white-space: nowrap !important; /* 絕對不換行 */
+    overflow: hidden;               /* 萬一螢幕極窄，隱藏超出部分保護版面 */
+    text-overflow: ellipsis;        /* 如果真的塞不下，尾端顯示 ... */
+    
+    padding: 12px 10px !important;  /* 稍微縮減左右內距，讓字有更多空間 */
+}
+
+/* 筆記與歷史紀錄 */
+.edit-area { padding: 15px; background: #fff; }
+.edit-box { margin-bottom: 15px; }
+.edit-label { font-weight: bold; margin-bottom: 5px; display: block; color: #333; font-size: 1em; border-left: 4px solid var(--green); padding-left: 8px; }
+.edit-input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; min-height: 80px; resize: vertical; font-family: inherit; }
+#records-view { display: none; padding: 15px; background: #fff; flex: 1; overflow-y: auto; }
+.rec-card { border-bottom: 1px solid #ddd; padding: 15px; cursor: pointer; background: #fff; margin-bottom: 10px; border-radius: 4px; border: 1px solid #eee; }
+.rec-card:hover { background: #f9f9f9; border-color: var(--blue-primary); }
+.rec-title { font-weight: bold; font-size: 1.1em; color: var(--blue-primary); margin-bottom: 5px; }
+.rec-meta { font-size: 0.9em; color: #666; display: flex; justify-content: space-between; }
+.scroll-hint-box { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); background: rgba(33, 37, 41, 0.75); color: #fff; padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; letter-spacing: 1px; pointer-events: none; z-index: 10000; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2); transition: opacity 0.4s ease; }
+
+/* 辭庫區塊 */
+.ci-container { margin-top: 25px; border-top: 1px solid #ccc; padding: 15px 5px; line-height: 1.6; font-size: 15px; }
+.ci-title { font-weight: bold; font-size: 1.1em; border-left: 5px solid var(--blue-primary); padding-left: 8px; margin-bottom: 10px; color: var(--blue-primary); background: #f0f8ff; padding: 5px 8px; }
+.ci-gua-text { color: var(--red); font-weight: bold; margin-bottom: 6px; }
+.ci-line-item { margin-bottom: 6px; border-bottom: 1px dashed #eee; padding-bottom: 4px; }
+
+/* ==========================================
+   ★ 7. 3D 硬幣物理模擬引擎
+========================================== */
+.coin-scene { perspective: 1000px; display: flex; gap: 15px; justify-content: center; align-items: center; margin: 30px 0; }
+.coin-wrapper { width: 65px; height: 65px; position: relative; transform-style: preserve-3d; }
+.coin-face { width: 100%; height: 100%; border-radius: 50%; position: absolute; backface-visibility: hidden; background-size: cover; background-position: center; box-shadow: 0 5px 10px rgba(0,0,0,0.4), inset 0 0 8px rgba(255,255,255,0.3); border: 2px solid #bba14f; }
+.coin-front { transform: rotateX(0deg); background-color: #f1c40f; }
+.coin-back { transform: rotateX(180deg); background-color: #bdc3c7; }
+
+/* ==========================================
+   ★ 8. RWD 手機版調整 (Media Queries)
+========================================== */
+@media only screen and (max-width: 768px) and (orientation: portrait) {
+    .classic-header { display: block; border: none; padding: 0; margin-bottom: 10px; background: #fff; border-radius: 6px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); overflow: hidden; margin-top: 5px; }
+    .mobile-info-wrapper { background: #f8f9fa; padding: 5px 4px !important; font-size: 0.9rem; color: #333; border-bottom: 1px solid #ddd; margin-bottom: 2px !important; }
+    .term-info { font-size: 0.8em; color: #666; margin-top: 4px; line-height: 1.4; display: flex; justify-content: space-between; }
+    
+    .gua-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: #fff; border: 1px solid #999; margin-top: 0px !important; }
+    .gua-table th:nth-child(1) { width: 11%; }
+    .gua-table th:nth-child(2) { width: 15%; }
+    .gua-table th:nth-child(3) { width: 11%; }
+    .gua-table th:nth-child(4) { width: 22%; }
+    .gua-table th:nth-child(5) { width: 14%; }
+    .gua-table th:nth-child(6) { width: 14%; }
+    .gua-table th:nth-child(7) { width: 11%; }
+    
+    .gua-table th { background: #f0f0f0; border: 1px solid #999; font-size: 0.8rem; padding: 4px 0; color: #333; }
+    .gua-table td { border: 1px solid #bbb; height: 40px; padding: 4px 0; text-align: center; vertical-align: middle; font-size: 0.95rem; position: relative; }
+    .beast-col { color: #A0522D; font-size: 0.85rem; }
+    
+    .ben-wrapper { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .yao-bar { width: 30px; height: 6px; margin: 1px 0; }
+    .y-s { background: #000; }
+    .y-b { display: flex; justify-content: space-between; }
+    .y-b span { width: 11px; height: 100%; background: #000; }
+    
+    .sy-mark { font-size: 0.8rem; color: #6f42c1; font-weight: bold; margin-top: 1px; }
+    .move-mark { position: absolute; right: 2px; top: 5px; color: #dc3545; font-weight: bold; font-size: 0.9rem; }
+    .fu-small { font-size: 0.7rem; line-height: 1; color: #666; transform: scale(0.9); }
+    .mobile-fu-rel { font-size: 0.75em; color: #666; }
+    
+    .classic-info, .right-header-group { display: none !important; }
+    .nav-bar { padding: 4px 8px; }
+    .filter-bar { gap: 4px; padding: 2px; }
+    .seal-btn { padding: 3px 8px; font-size: 1.05em; }
+}
+
+/* ==========================================
+   ★ 9. 全域動畫庫 (Global Animations)
+========================================== */
+
+/* 1. 彈出視窗：背景淡入 */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* 2. 彈出視窗：主體浮起 */
+@keyframes popUp {
+    from { 
+        opacity: 0; 
+        transform: scale(0.95) translateY(10px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: scale(1) translateY(0); 
+    }
+}
+
+/* 3. Toast 提示訊息：降下與升起 */
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translate(-50%, -10px); }
+    15% { opacity: 1; transform: translate(-50%, 0); }
+    85% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, -10px); }
+}
+
+/* 4. 發光與閃爍特效 */
+@keyframes zhiGlow {
+    0% { box-shadow: 0 0 4px rgba(255, 152, 0, 0.8); background-color: #ffeb3b; }
+    50% { box-shadow: 0 0 16px rgba(255, 87, 34, 1); background-color: #fff59d; transform: scale(1.05); }
+    100% { box-shadow: 0 0 4px rgba(255, 152, 0, 0.8); background-color: #ffeb3b; }
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* 5. 3D 硬幣掉落動畫 */
+@keyframes flip-yang {
+    0%   { transform: translateY(0) scale(1) rotateX(0deg); }
+    50%  { transform: translateY(-150px) scale(1.3) rotateX(1800deg); }
+    100% { transform: translateY(0) scale(1) rotateX(3600deg); }
+}
+
+@keyframes flip-yin {
+    0%   { transform: translateY(0) scale(1) rotateX(0deg); }
+    50%  { transform: translateY(-150px) scale(1.3) rotateX(1890deg); }
+    100% { transform: translateY(0) scale(1) rotateX(3780deg); }
+}
+
+/* ==========================================
+   ★ 設定面板內部文字 (自適應放大)
+========================================== */
+/* 主要選項文字 (例如：預設開啟南半球...) */
+.set-main-text {
+    font-size: clamp(0.95rem, 4.5vw, 1.15rem) !important;
+    font-weight: bold;
+    color: #333;
+    white-space: nowrap;
+}
+
+/* 次要選項/按鈕文字 (例如：離線圖資擴充、系統內建...) */
+.set-sub-text {
+    font-size: clamp(0.85rem, 4vw, 1.05rem) !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ==========================================
+   ★ 效能優化：利用 data 屬性控制變爻的顯示/隱藏
+========================================== */
+/* 當表格屬性為 move (僅顯動爻) 時，將沒有發動的爻 (ly-static-bian) 內部元素隱藏 */
+/* 這裡隱藏子元素( > * ) 而不是整個 td，是為了維持表格排版不變形 */
+.gua-table[data-bian="move"] .ly-static-bian > * {
+    display: none !important;
+}
+
+/* ==========================================
+   ★ 開頭畫面專屬轉圈動畫 (彩虹變色 + 太極雙向旋轉)
+========================================== */
+.splash-spinner {
+    width: 40px; 
+    height: 40px; 
+    border-radius: 50%; 
+    
+    /* 將底層軌道改成淡灰色，這樣彩虹色劃過時會更亮眼 */
+    border: 4px solid rgba(200, 200, 200, 0.3); 
+    
+    /* ★ 核心魔法：用逗號隔開，同時掛載兩個動畫！ */
+    /* 1. 旋轉動畫 (每 1 秒轉一圈) */
+    /* 2. 變色動畫 (每 3 秒跑完一次彩虹漸層) */
+    animation: 
+        splashSpin 1s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite,
+        rainbowColor 3s linear infinite;
+}
+
+/* ★ 新增：內層太極樣式 (如果你還有保留太極的話) */
+.splash-taichi {
+    font-size: 28px;
+    color: #666; /* 太極改成低調的深灰色，以免搶了彩虹的風采 */
+    animation: splashSpinReverse 1.5s linear infinite; 
+}
+
+/* 原本的：順時針旋轉 */
+@keyframes splashSpin { 
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 原本的：逆時針旋轉 (給太極用的) */
+@keyframes splashSpinReverse {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(-360deg); }
+}
+
+/* ★ 全新：彩虹變色關鍵影格 (Keyframes) */
+@keyframes rainbowColor {
+    0%   { border-top-color: #ff4d4d; } /* 柔和紅 */
+    15%  { border-top-color: #ffaf40; } /* 柔和橙 */
+    30%  { border-top-color: #f1c40f; } /* 亮黃 */
+    45%  { border-top-color: #32ff7e; } /* 柔和綠 */
+    60%  { border-top-color: #18dcff; } /* 亮天藍 */
+    75%  { border-top-color: #7158e2; } /* 柔和靛 */
+    90%  { border-top-color: #cd84f1; } /* 柔和紫 */
+    100% { border-top-color: #ff4d4d; } /* 無縫接軌回紅色 */
+}
+
+/* ==========================================
+   ★ 道法感應文字與點點動畫
+========================================== */
+/* 原本的：整體文字的靈氣呼吸 (保留不變) */
+@keyframes mysticBreath {
+    0%   { opacity: 0.4; text-shadow: 0 0 0px rgba(100, 100, 100, 0); }
+    50%  { opacity: 1; text-shadow: 0 0 12px rgba(100, 100, 100, 0.6); }
+    100% { opacity: 0.4; text-shadow: 0 0 0px rgba(100, 100, 100, 0); }
+}
+
+.ly-mystic-text {
+    animation: mysticBreath 2.5s ease-in-out infinite;
+}
+
+/* ★ 全新：點點專屬的漸顯漸隱動畫 */
+@keyframes dotFade {
+    0%, 100% { opacity: 0; }  /* 開頭和結尾都是透明的 */
+    50%      { opacity: 1; }  /* 中間時完全浮現 */
+}
+
+/* 讓三個點點都套用同一個動畫，週期為 1.5 秒 */
+.ly-dot1, .ly-dot2, .ly-dot3 {
+    animation: dotFade 1.5s infinite ease-in-out;
+}
+
+/* ★ 核心魔法：利用時間差 (Delay)，製造出 1, 2, 3 依序出現的波浪感 */
+.ly-dot1 { animation-delay: 0s; }    /* 第一個點馬上開始 */
+.ly-dot2 { animation-delay: 0.3s; }  /* 第二個點晚 0.3 秒出現 */
+.ly-dot3 { animation-delay: 0.6s; }  /* 第三個點晚 0.6 秒出現 */
+
+/* ==========================================
+   ★ 開頭畫面專屬轉圈動畫 (太極雙向旋轉)
+
+.splash-spinner {
+    width: 40px; 
+    height: 40px; 
+    border: 4px solid rgba(13, 110, 253, 0.2); 
+    border-top-color: var(--blue-primary, #0d6efd); 
+    border-radius: 50%; 
+    animation: splashSpin 1s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+}
+
+@keyframes splashSpin { 
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+
+.splash-taichi {
+    font-size: 28px;
+    color: var(--blue-primary, #000000);
+    /* 刻意讓內圈轉速稍微慢一點 (1.5s)，與外圈 (1s) 形成錯視的視覺層次感 
+    animation: splashSpinReverse 1.5s linear infinite; 
+}
+
+/* 原本的正轉 
+@keyframes splashSpin { 
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ★ 新增：逆時針反轉 
+@keyframes splashSpinReverse {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(-360deg); }
+}
+    ========================================== */

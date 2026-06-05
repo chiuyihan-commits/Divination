@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>六爻排盤</title>
+    <!--Netlify使用-->
+    <link rel="manifest" href="ly_manifest.json">
+    <!--Netlify使用-->
+    <link rel="stylesheet" href="ly_style.css">
+</head>
+
+<body>
+    <div id="ly-splash-screen" style="
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+        background-color: #f8f9fa; z-index: 9999999; 
+        display: flex; flex-direction: column; align-items: center; justify-content: center; 
+        transition: opacity 0.4s ease-out, visibility 0.4s ease-out;">
+
+        <div
+            style="font-size: 2.2rem; font-weight: bold; color: var(--blue-primary, #0d6efd); letter-spacing: 6px; margin-bottom: 20px; text-shadow: 0 2px 4px rgba(0,0,0,0.1); animation: pulse 1.5s infinite;">
+            六爻排盤</div>
+
+        <div
+            style="position: relative; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
+            <div class="splash-spinner" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></div>
+            <div class="splash-taichi">☯</div>
+        </div>
+        <div class="ly-mystic-text" style="margin-top: 15px; font-size: 0.9rem; color: #666; letter-spacing: 2px;">
+    道法感應中<span class="ly-dot1">.</span><span class="ly-dot2">.</span><span class="ly-dot3">.</span>
+</div>
+        <script>
+            (function() {
+                let spinner = document.querySelector('.splash-spinner');
+                if (spinner) {
+                    // 隨機產生 0 到 3 之間的秒數 (因為彩虹動畫全長 3 秒)
+                    let randomTime = (Math.random() * 3).toFixed(2);
+                    
+                    // 設定動畫延遲：第一個 0s 給旋轉動畫，第二個負秒數給彩虹變色動畫
+                    // 負數會讓動畫一開始就「快轉」到該秒數的顏色！
+                    spinner.style.animationDelay = `0s, -${randomTime}s`;
+                }
+            })();
+        </script>
+    </div>
+    <!-- ★ 修改模式的半透明黑底 -->
+    <div id="edit-backdrop"
+        style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.6); z-index:9998; backdrop-filter: blur(3px);">
+    </div>
+
+    <!-- ★ 修改模式的彈出視窗 CSS 魔法 -->
+    <style>
+        .edit-modal-mode {
+            position: fixed !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            width: 92% !important;
+            max-width: 500px !important;
+            max-height: 90vh !important;
+            overflow-y: auto !important;
+            z-index: 9999 !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+            border-radius: 12px !important;
+            background: white !important;
+            margin: 0 !important;
+        }
+    </style>
+    <div id="portal-view" class="portal-container" style="padding: 5px;">
+        <div class="card" style="padding: 8px; margin-bottom: 5px;">
+            <div id="portal-header-title" class="portal-header" style="margin-bottom: 8px; padding-bottom: 5px;">六爻排盤
+            </div>
+
+            <div class="master-switch-area" style="margin-bottom: 8px; font-size: 0.95rem;">
+                性別：<label><input type="radio" name="gender" value="男" checked>男</label> <label
+                    style="margin-left:10px;"><input type="radio" name="gender" value="女">女</label>
+            </div>
+
+            <div id="portal-msg"
+                style="color: var(--red); font-size: 0.95rem; text-align: center; font-weight: bold; min-height: 1.2em; margin-bottom: 5px;">
+            </div>
+            <div id="south-adjust-wrapper" style="display:none; margin-bottom:8px; text-align:center;">
+                <label style="color:#dc3545; font-weight:bold; font-size:0.95rem; cursor:pointer;">
+                    <input type="checkbox" id="cb-south-adjust"> 🌏 啟用南半球節氣對沖 (月建對沖)
+                </label>
+            </div>
+            <div class="top-action-group">
+                <button class="action-btn top-action-btn" style="margin-bottom:0; background: #17a2b8;"
+                    onclick="autoLocateCity()">📍 帶入時位</button>
+                <button class="action-btn top-action-btn" style="margin-bottom:0; background: #ff9800;"
+                    onclick="openTimeModal()">🕒 自訂時位</button>
+                <button class="action-btn top-action-btn" style="margin-bottom:0; background: #6c757d;"
+                    onclick="openSettings()">⚙️ 系統設定</button>
+            </div>
+
+            <div class="form-row" style="margin-top:8px; margin-bottom:6px;">
+                <div class="label-box" style="width:40px; font-size:0.95rem;">問題</div>
+                <div class="input-content"><input type="text" id="p-question" placeholder="請輸入占卜問題..."
+                        style="padding:6px; font-size:0.95rem;"></div>
+            </div>
+
+            <div id="manual-yao-rows"></div>
+
+            <details
+                style="margin-top:8px; background:#f9f9f9; border-radius:4px; border:1px solid #ddd; overflow:hidden;">
+                <summary class="adv-settings-summary"
+                    style="padding: 6px 10px; font-weight:bold; color:#555; cursor:pointer; list-style:none; outline:none; display:flex; justify-content:space-between; align-items:center; font-size:0.9rem;">
+                    ⚙️ 進階排盤設定 <span style="font-size:0.8em;"></span>
+                </summary>
+                <div style="padding: 8px; border-top:1px solid #ddd; font-size:0.9rem;">
+                    <div class="form-row" style="margin-bottom:4px;">
+                        <div class="label-box" style="width:70px;">納甲系統</div>
+                        <div class="input-content"><select id="set-najia" class="full-width" style="padding:4px;">
+                                <option value="standard">京房易之納甲法</option>
+                                <option value="wu">京房易之乾卦自午起</option>
+                                <option value="zang">藏山雷學之藏山卜</option>
+                            </select></div>
+                    </div>
+                    <div class="form-row" style="margin-bottom:4px;">
+                        <div class="label-box" style="width:70px;">伏神系統</div>
+                        <div class="input-content"><select id="set-fushen" class="full-width" style="padding:4px;">
+                                <option value="wang">王洪緒之《卜筮正宗》</option>
+                                <option value="jing">京房之《京房易卦》</option>
+                            </select></div>
+                    </div>
+                    <div class="form-row" style="margin-bottom:4px;">
+                        <div class="label-box" style="width:70px;">變爻顯示</div>
+                        <div class="input-content"><select id="set-bian-view" class="full-width" style="padding:4px;">
+                                <option value="all">全顯變爻</option>
+                                <option value="move" selected>僅顯示動爻之變爻</option>
+                            </select></div>
+                    </div>
+                    <div class="form-row" style="margin-bottom:0;">
+                        <div class="label-box" style="width:70px;">卦辭爻辭</div>
+                        <div class="input-content"><select id="set-show-ci" class="full-width" style="padding:4px;">
+                                <option value="0" selected>不顯示</option>
+                                <option value="1">顯示</option>
+                            </select></div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- 平常顯示的按鈕 -->
+            <div id="normal-action-btns" class="btn-row"
+                style="flex-wrap: nowrap; margin-top: 10px; display: flex; width: 100%; gap: 8px;">
+                <button class="btn-p btn-blue" style="flex: 1; white-space: nowrap;"
+                    onclick="startManual()">手動起卦</button>
+                <button class="btn-p btn-green" style="flex: 1; white-space: nowrap;"
+                    onclick="startAuto()">電腦起卦</button>
+                <button class="btn-p" style="flex: 1; background:#6c757d; white-space: nowrap;"
+                    onclick="showRecords()">起卦紀錄</button>
+            </div>
+
+            <!-- ★ 進入修改模式時顯示的按鈕 (預設隱藏) -->
+            <div id="edit-action-btns" class="btn-row"
+                style="flex-wrap: nowrap; margin-top: 10px; display: none; width: 100%; gap: 8px;">
+                <button class="btn-p"
+                    style="flex: 1; background:#6c757d; padding: 12px 2px; font-size: 1.1rem; font-weight: bold;"
+                    onclick="cancelEditMode()">❌ 取消</button>
+                <button class="btn-p btn-blue"
+                    style="flex: 1; padding: 12px 2px; font-size: 1.1rem; font-weight: bold; background: #198754;"
+                    onclick="confirmEditMode()">✅ 確認修改</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="time-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content">
+            <button onclick="cancelTimeModal()"
+                style="position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; background-color: #dc3545; color: white; border: none; border-radius: 50%; font-weight: bold; font-size: 1.1rem; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10; padding: 0;">✕</button>
+
+            <h3
+                style="margin-top:0; color:var(--blue-primary); text-align:center; margin-bottom:15px; padding-right: 20px;">
+                🕒 設定起卦時間與地區</h3>
+
+            <div class="switch-container" style="margin-bottom: 12px;">
+                <div id="sw-true" class="switch-btn switch-active" style="padding: 4px 15px;" onclick="setMode(true)">
+                    西元時間</div>
+                <div id="sw-false" class="switch-btn switch-inactive" style="padding: 4px 15px;"
+                    onclick="setMode(false)">干支四柱</div>
+            </div>
+
+            <div id="mode-true" style="display:block;">
+                <div style="display: flex; gap: 3px; margin-bottom: 12px;">
+                    <div
+                        style="flex: 1.5; display: flex; align-items: center; border: 1px solid #ccc; border-radius: 4px; background: #fff; padding: 2px;">
+                        <select id="ts-year"
+                            style="width: 100%; border: none; outline: none; background: transparent; font-size: 0.85rem; padding:0;"></select>
+                    </div>
+                    <div
+                        style="flex: 1; display: flex; align-items: center; border: 1px solid #ccc; border-radius: 4px; background: #fff; padding: 2px;">
+                        <select id="ts-month"
+                            style="width: 100%; border: none; outline: none; background: transparent; font-size: 0.85rem; padding:0;"></select><span
+                            style="color:#666; font-size:0.75rem; margin-left:-2px;">月</span>
+                    </div>
+                    <div
+                        style="flex: 1; display: flex; align-items: center; border: 1px solid #ccc; border-radius: 4px; background: #fff; padding: 2px;">
+                        <select id="ts-day"
+                            style="width: 100%; border: none; outline: none; background: transparent; font-size: 0.85rem; padding:0;"></select><span
+                            style="color:#666; font-size:0.75rem; margin-left:-2px;">日</span>
+                    </div>
+                    <div
+                        style="flex: 1; display: flex; align-items: center; border: 1px solid #ccc; border-radius: 4px; background: #fff; padding: 2px;">
+                        <select id="ts-hour"
+                            style="width: 100%; border: none; outline: none; background: transparent; font-size: 0.85rem; padding:0;"></select><span
+                            style="color:#666; font-size:0.75rem; margin-left:-2px;">時</span>
+                    </div>
+                    <div
+                        style="flex: 1; display: flex; align-items: center; border: 1px solid #ccc; border-radius: 4px; background: #fff; padding: 2px;">
+                        <select id="ts-minute"
+                            style="width: 100%; border: none; outline: none; background: transparent; font-size: 0.85rem; padding:0;"></select><span
+                            style="color:#666; font-size:0.75rem; margin-left:-2px;">分</span>
+                    </div>
+                </div>
+
+                <div style="background: #e9ecef; padding: 12px; border-radius: 8px; margin-bottom: 10px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span style="font-weight: bold; font-size: 0.95rem; color:#333;">📍 經緯度與定位設定</span>
+                        <button class="action-btn"
+                            style="background:#17a2b8; margin:0; font-size:0.8rem; padding:4px 10px; border-radius:4px; letter-spacing:0; height:auto; line-height:1.2; box-shadow:none; white-space: nowrap; width: fit-content; flex-shrink: 0;"
+                            onclick="autoLocateCity()">🧭 GPS校準</button>
+                    </div>
+
+                    <div id="modal-msg"
+                        style="color: var(--red); font-size: 0.85rem; text-align: center; font-weight: bold; min-height: 1.2em; margin-bottom: 8px;">
+                    </div>
+
+                    <div class="input-wrapper" style="margin-bottom:8px;">
+                        <select id="city-select" onchange="setCityLoc()">
+                            <option value="">-- 手動選擇台灣縣市 --</option>
+                            <option value="121.5654,25.0329">台北市</option>
+                            <option value="121.4650,25.0112">新北市</option>
+                            <option value="121.7428,25.1315">基隆市</option>
+                            <option value="121.3148,24.9936">桃園市</option>
+                            <option value="120.9721,24.8143">新竹市</option>
+                            <option value="121.0150,24.8385">新竹縣</option>
+                            <option value="120.8176,24.5601">苗栗縣</option>
+                            <option value="120.6736,24.1477">台中市</option>
+                            <option value="120.5393,24.0755">彰化縣</option>
+                            <option value="120.6841,23.9038">南投縣</option>
+                            <option value="120.4491,23.4800">嘉義市</option>
+                            <option value="120.2930,23.4518">嘉義縣</option>
+                            <option value="120.3015,23.5714">雲林縣</option>
+                            <option value="120.1838,22.9997">台南市</option>
+                            <option value="120.3014,22.6272">高雄市</option>
+                            <option value="120.4879,22.6775">屏東縣</option>
+                            <option value="121.7533,24.7523">宜蘭縣</option>
+                            <option value="121.6044,23.9820">花蓮縣</option>
+                            <option value="121.1444,22.7583">台東縣</option>
+                            <option value="119.5664,23.5673">澎湖縣</option>
+                            <option value="118.3185,24.4363">金門縣</option>
+                            <option value="119.9328,26.1554">連江縣</option>
+                            <option value="other">📍 其他 / 海外地區</option>
+                        </select>
+                    </div>
+
+                    <div class="row-group" style="margin-bottom: 6px;">
+                        <div class="input-wrapper"><label>東經</label><input type="number" id="ts-lon" value="121.5"><span
+                                class="unit">度</span></div>
+                        <div class="input-wrapper"><label>北緯</label><input type="number" id="ts-lat" value="25.0"><span
+                                class="unit">度</span></div>
+                    </div>
+                    <div class="row-group" style="margin-bottom: 6px;">
+                        <div class="input-wrapper"><label>時差</label><input type="number" id="ts-zone" value="-480"><span
+                                class="unit">分</span></div>
+                        <div class="input-wrapper"><label>高度</label><input type="number" id="ts-alt" value="0"><span
+                                class="unit">m</span></div>
+                    </div>
+
+                    <div id="modal-south-adjust-wrapper"
+                        style="display:none; text-align:center; padding-top:8px; border-top:1px dashed #ccc;">
+                        <label style="color:#dc3545; font-weight:bold; font-size:0.95rem; cursor:pointer;">
+                            <input type="checkbox" id="modal-cb-south-adjust"> 🌏 啟用南半球節氣對沖
+                        </label>
+                    </div>
+                </div>
+
+                <div class="input-wrapper" style="margin-bottom:5px;">
+                    <label>換日</label> <select id="ts-day-break">
+                        <option value="0">子初換日 (23:00)</option>
+                        <option value="1">子正換日 (00:00)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="mode-false" style="display:none;">
+                <div class="ganzhi-grid">
+                    <div class="ganzhi-col">
+                        <div class="ganzhi-label">時</div>
+                        <div class="gz-select-group"><select id="gz-h-gan" class="gz-sel"></select><select id="gz-h-zhi"
+                                class="gz-sel"></select></div>
+                    </div>
+                    <div class="ganzhi-col">
+                        <div class="ganzhi-label">日</div>
+                        <div class="gz-select-group"><select id="gz-d-gan" class="gz-sel"></select><select id="gz-d-zhi"
+                                class="gz-sel"></select></div>
+                    </div>
+                    <div class="ganzhi-col">
+                        <div class="ganzhi-label">月</div>
+                        <div class="gz-select-group"><select id="gz-m-gan" class="gz-sel"></select><select id="gz-m-zhi"
+                                class="gz-sel"></select></div>
+                    </div>
+                    <div class="ganzhi-col">
+                        <div class="ganzhi-label">年</div>
+                        <div class="gz-select-group"><select id="gz-y-gan" class="gz-sel"></select><select id="gz-y-zhi"
+                                class="gz-sel"></select></div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="action-btn" style="background:#198754; margin-top:15px; font-size:1.1rem; padding:10px;"
+                onclick="closeTimeModal()">✅ 儲存並返回</button>
+        </div>
+    </div>
+
+    <div id="result-view" style="display:none;">
+        <svg id="rel-svg"
+            style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:9999; overflow:visible;">
+            <defs>
+                <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#198754" />
+                </marker>
+                <marker id="arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc3545" />
+                </marker>
+                <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#0d6efd" />
+                </marker>
+                <marker id="arrow-purple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#6f42c1" />
+                </marker>
+                <marker id="arrow-gold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#e6a23c" />
+                </marker>
+                <marker id="arrow-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#6c757d" />
+                </marker>
+                <marker id="arrow-brown" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#8B4513" />
+                </marker>
+                <marker id="arrow-dark" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#343a40" />
+                </marker>
+            </defs>
+            <g id="rel-lines"></g>
+        </svg>
+
+        <div class="nav-bar"
+            style="position: sticky; position: -webkit-sticky; top: 0; z-index: 10000; background-color: rgba(255, 255, 255, 0.95); backdrop-filter: blur(5px); width: 100%; max-width: 100vw; box-sizing: border-box; border-bottom: 1px solid #ddd; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; padding: 6px 4px; flex-wrap: nowrap; gap: 2px;">
+
+            <div style="flex:0 0 auto;">
+                <button onclick="goBackPortal()"
+                    style="border:1px solid #999; padding:3px 6px; border-radius:4px; background:#fff; font-size:0.85em; white-space:nowrap; cursor:pointer;">返回</button>
+            </div>
+
+            <div style="flex:1 1 auto; display:flex; justify-content:center; gap:2px; align-items:center;">
+                <select id="res-set-najia" onchange="applyResultSettings()" class="mini-sel"
+                    style="font-size:0.75em; padding:2px 0px; max-width: 30vw; text-align: center;">
+                    <option value="standard">京房納甲</option>
+                    <option value="wu">午起納甲</option>
+                    <option value="zang">藏山納甲</option>
+                </select>
+                <select id="res-set-fushen" onchange="applyResultSettings()" class="mini-sel"
+                    style="font-size:0.75em; padding:2px 0px; max-width: 30vw; text-align: center;">
+                    <option value="wang">卜筮伏神</option>
+                    <option value="jing">京房伏神</option>
+                </select>
+                <select id="res-set-bian" onchange="applyResultSettings()" class="mini-sel"
+                    style="font-size:0.75em; padding:2px 0px; max-width: 30vw; text-align: center;">
+                    <option value="move">僅顯動爻</option>
+                    <option value="all">全顯變爻</option>
+                </select>
+            </div>
+
+            <div style="flex:0 0 auto;">
+                <button onclick="saveRec()"
+                    style="background:var(--red); color:white; border:none; border-radius:4px; padding:3px 10px; font-weight:bold; font-size:0.85em; white-space:nowrap; cursor:pointer;">儲存</button>
+            </div>
+        </div>
+
+        <div class="classic-header"></div>
+        <div id="res-gong-title"
+            style="text-align:center; font-weight:bold; margin-top:5px; margin-bottom:10px; font-size:1.1em;"></div>
+
+        <table class="gua-table">
+            <thead></thead>
+            <tbody id="gua-tbody"></tbody>
+        </table>
+        <!-- ★ 分數細節框：字體從 0.9em 縮小到 0.75em -->
+        <div id="score-detail-box"
+            style="display:none; margin:2px 10px; padding:4px; background:#fff3cd; color:#856404; font-size:0.75em; border-radius:4px; text-align:center; box-shadow:inset 0 0 3px rgba(0,0,0,0.1);">
+        </div>
+
+        <div id="rel-filter-bar" class="filter-bar" style="display:none;"></div>
+
+        <div id="extra-prompts"></div>
+
+        <div id="ci-area" class="ci-container" style="display:none;"></div>
+        <details class="notes-section" open
+            style="margin-top: 15px; border: 1px solid #ddd; border-radius: 8px; background: #fff; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <summary class="notes-summary"
+                style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f8f9fa; cursor: pointer; border-bottom: 1px solid #ddd; font-weight: bold; color: #333;">
+                <span style="font-size: 1.05em;">📝 占斷與筆記</span>
+                <div style="display: flex; gap: 8px;" onclick="event.stopPropagation()"> <!-- 阻止點擊按鈕時收合面板 -->
+                    <!-- ★ 藍底帶圖示的自適應編輯按鈕 -->
+                    <button id="btn-edit-notes" class="action-btn"
+                        style="display:none; margin:0; padding: 6px 14px; font-size: 0.9em; background: #0d6efd; color: white; border: none; border-radius: 6px; cursor: pointer; box-shadow: 0 2px 4px rgba(13,110,253,0.3); font-weight: normal; white-space: nowrap;"
+                        onclick="enableNotesEdit(event)">✏️ 編輯</button>
+                    <!-- ★ 藍底帶圖示的自適應更新按鈕 -->
+                    <button id="btn-update-rec" class="action-btn"
+                        style="display:none; margin:0; padding: 6px 14px; font-size: 0.9em; background: #0d6efd; color: white; border: none; border-radius: 6px; cursor: pointer; box-shadow: 0 2px 4px rgba(13,110,253,0.3); font-weight: normal; white-space: nowrap;"
+                        onclick="updateCurrentRec()">💾 更新紀錄</button>
+                </div>
+            </summary>
+            <div class="edit-area" style="padding: 15px;">
+                <div class="edit-box" style="margin-bottom: 12px;">
+                    <label class="edit-label"
+                        style="display: block; margin-bottom: 5px; color: #555; font-weight: bold; font-size: 0.9em;">占斷結果：</label>
+                    <textarea id="edit-judge" class="edit-input" placeholder="請輸入您的解卦判斷..."
+                        style="width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 4px; min-height: 80px; font-size: 0.95em; line-height: 1.5; resize: vertical; transition: background-color 0.3s;"></textarea>
+                </div>
+                <div class="edit-box" style="margin-bottom: 12px;">
+                    <label class="edit-label"
+                        style="display: block; margin-bottom: 5px; color: #555; font-weight: bold; font-size: 0.9em;">事後回饋：</label>
+                    <textarea id="edit-feedback" class="edit-input" placeholder="請輸入實際發生的結果..."
+                        style="width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 4px; min-height: 80px; font-size: 0.95em; line-height: 1.5; resize: vertical; transition: background-color 0.3s;"></textarea>
+                </div>
+                <div class="edit-box" style="margin-bottom: 0;">
+                    <label class="edit-label"
+                        style="display: block; margin-bottom: 5px; color: #555; font-weight: bold; font-size: 0.9em;">備註：</label>
+                    <textarea id="edit-note" class="edit-input" placeholder="其他筆記..."
+                        style="width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 4px; min-height: 60px; font-size: 0.95em; line-height: 1.5; resize: vertical; transition: background-color 0.3s;"></textarea>
+                </div>
+            </div>
+        </details>
+    </div>
+
+    <div id="records-view" style="display:none; position: relative;">
+        <div class="nav-bar">
+            <button onclick="goBackPortal()"
+                style="border:1px solid #999; padding:5px 10px; border-radius:4px; background:#fff;">← 返回</button>
+            <div style="font-weight:bold; line-height:30px;">歷史紀錄</div>
+            <div style="width:50px;"></div>
+        </div>
+        <div id="rec-list-container" style="margin-top:10px; padding-bottom:30px;"></div>
+
+        <!-- ★ 新增：上下雙箭頭滾動提示燈 (預設全透明) -->
+        <div id="scroll-hint" class="scroll-hint-box" style="display: none; opacity: 0;">
+            <div style="display:flex; flex-direction:column; line-height: 0.9; font-size: 0.75rem; margin-right: 6px;">
+                <span>▲</span>
+                <span>▼</span>
+            </div>
+            上下滑動
+        </div>
+    </div>
+
+    <div id="anim-overlay"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100dvh; background:rgba(0,0,0,0.9); z-index:99999; flex-direction:column; justify-content:center; align-items:center; color:white;">
+        <div id="anim-msg"
+            style="font-size:1.5rem; font-weight:bold; margin-bottom:20px; color:#ffeb3b; text-align:center;"></div>
+
+        <div id="anim-main-content"
+            style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
+            <img id="anim-img" src=""
+                style="max-width:90%; max-height:50vh; border-radius:10px; display:none; object-fit:contain;">
+            <div id="anim-default" style="display:none;"></div>
+        </div>
+
+        <div id="next-yao-hint" class="yin-seal-ghost" style="display:none;">請接著擲下一爻</div>
+
+        <div id="shake-hint"
+            style="font-size:1.2rem; margin-top:30px; color:#ccc; display:none; animation: pulse 1.5s infinite;">📳
+            請搖晃手機 (或點擊畫面) 擲幣...</div>
+    </div>
+
+
+    <div id="settings-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content" style="padding-bottom: 15px;">
+
+            <button onclick="requestCloseSettings()"
+                style="position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; background-color: #dc3545; color: white; border: none; border-radius: 50%; font-weight: bold; font-size: 1.1rem; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10; padding: 0;">✕</button>
+
+            <h3 style="margin-top:0; color:#6c757d; text-align:center; margin-bottom:15px; padding-right: 20px;">⚙️ 系統設定
+            </h3>
+
+            <details
+                style="background: #f4f9ff; border-radius:8px; margin-bottom:12px; border:1px solid #cce0ff; box-shadow:0 2px 5px rgba(0,0,0,0.02); overflow:hidden;">
+                <summary class="settings-summary"
+                    style="font-weight:bold; cursor:pointer; background: #e6f0fa; color: #004085; outline:none; display:flex; justify-content:space-between; align-items:center;">
+                    🌍 全球化與定位設定
+                </summary>
+                <div style="padding:15px; border-top:1px solid #cce0ff; background:transparent;">
+
+                    <label class="set-main-text"
+                        style="color:#dc3545; cursor:pointer; width: 100%; display: flex; align-items: center; margin-bottom: 12px;">
+                        <input type="checkbox" id="set-south-adjust"
+                            style="transform: scale(1.2); margin-right: 8px; flex-shrink: 0;">
+                        預設開啟南半球節氣對沖 (月建)
+                    </label>
+
+                    <div style="border-top: 1px dashed #ccc; padding-top: 12px;">
+                        <div
+                            style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap: 8px;">
+                            <span class="set-main-text">🗺️ 離線圖資擴充</span>
+                            <label class="action-btn set-sub-text"
+                                style="background:#0d6efd; margin:0; padding:6px 10px !important; width:auto; cursor:pointer; letter-spacing:0; box-shadow:none; flex-shrink:0;">
+                                ➕ 匯入地圖 <input type="file" id="import-geojson" accept=".json" style="display:none;"
+                                    onchange="handleGeoJsonUpload(this)">
+                            </label>
+                        </div>
+
+                        <div id="map-list-container" style="display:flex; flex-direction:column; gap:6px;">
+                            <div
+                                style="display:flex; justify-content:space-between; background:#e7f1ff; border:1px solid #b8daff; padding:8px 10px; border-radius:4px; align-items:center; gap: 6px;">
+                                <span class="set-sub-text" style="color:#004085; font-weight:bold;">🇹🇼 台灣精準圖資
+                                    (內建)</span>
+                                <span class="set-sub-text" style="color:#28a745; font-weight:bold; flex-shrink:0;">●
+                                    啟用中</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <details
+                style="background: #f4fcf4; border-radius:8px; margin-bottom:12px; border:1px solid #c3e6cb; box-shadow:0 2px 5px rgba(0,0,0,0.02); overflow:hidden;">
+                <summary class="settings-summary"
+                    style="font-weight:bold; cursor:pointer; background: #e8f5e9; color: #155724; outline:none; display:flex; justify-content:space-between; align-items:center;">
+                    🎨 圖像與擲幣動畫設定
+                </summary>
+
+                <div style="padding:15px; background:transparent;">
+                    <div style="font-weight:bold; margin-bottom:10px; font-size:0.95rem; color:#333;">✨ 自訂專屬開場圖</div>
+
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; width:100%;">
+
+                        <input type="file" id="upload-splash" accept="image/gif, image/jpeg, image/png"
+                            style="font-size: 0.85rem; flex: 1; min-width: 0; border: 1px solid #ccc; padding: 4px; border-radius: 4px; background: #fff;">
+
+                        <button onclick="clearCustomSplash()"
+                            style="background:#dc3545; color:#fff; border:none; border-radius:4px; padding:6px 12px; font-size:0.85rem; cursor:pointer; white-space:nowrap; flex-shrink: 0; box-shadow:0 1px 2px rgba(0,0,0,0.1);">
+                            🗑️ 清除圖片
+                        </button>
+
+                    </div>
+
+                    <div style="font-size: 0.8rem; color: #666; margin-bottom: 15px;">※ 限制 200KB 以下 (支援 GIF/PNG/JPG)
+                    </div>
+
+                    <div style="border-top:1px dashed #ccc; padding-top:15px; margin-top:5px;">
+
+                        <div style="font-weight:bold; margin-bottom:10px; font-size:0.95rem; color:#333;">擲幣視覺模式</div>
+                        <div style="display:flex; gap:15px; font-size:0.9rem; margin-bottom:10px;">
+                            <label style="display:flex; align-items:center; cursor:pointer;">
+                                <input type="radio" name="toss-mode" value="video" checked
+                                    style="margin-right:6px; transform:scale(1.2);"> 傳統影片/GIF
+                            </label>
+                            <label style="display:flex; align-items:center; cursor:pointer;">
+                                <input type="radio" name="toss-mode" value="3d"
+                                    style="margin-right:6px; transform:scale(1.2);"> 3D 模擬硬幣
+                            </label>
+                        </div>
+
+                        <div id="settings-3d-coin"
+                            style="display:none; border-top:1px dashed #ccc; padding-top:12px; margin-top:10px;">
+                            <div style="font-size:0.8rem; color:#666; margin-bottom:8px;">上傳您專屬的銅錢正反面 (建議為正方形圖片)：</div>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                                <div
+                                    style="border:1px solid #ddd; padding:8px; border-radius:6px; text-align:center; background:#fff;">
+                                    <div style="font-weight:bold; font-size:0.85rem; margin-bottom:6px; color:#e6a23c;">
+                                        陽面
+                                        (人頭 / 面)</div>
+                                    <input type="file" id="img-coin-front" accept="image/*"
+                                        style="width:100%; font-size:0.75rem;">
+                                </div>
+                                <div
+                                    style="border:1px solid #ddd; padding:8px; border-radius:6px; text-align:center; background:#fff;">
+                                    <div style="font-weight:bold; font-size:0.85rem; margin-bottom:6px; color:#6c757d;">
+                                        陰面
+                                        (文字 / 字)</div>
+                                    <input type="file" id="img-coin-back" accept="image/*"
+                                        style="width:100%; font-size:0.75rem;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="original-image-settings-content"
+                            style="border-top:1px dashed #ccc; padding-top:12px; margin-top:10px;">
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">
+                                <div
+                                    style="border:1px solid #ddd; padding:8px; border-radius:6px; text-align:center; background:#e7f1ff;">
+                                    <div style="font-weight:bold; font-size:0.85rem; margin-bottom:6px;">準備 (🙏)</div>
+                                    <input type="file" id="img-up-prep" accept="image/*,video/*"
+                                        style="width:100%; font-size:0.75rem; margin-bottom:6px;">
+                                    <div style="font-size:0.85rem;">播 <input type="number" id="img-tm-prep" value="200"
+                                            min="50" step="50" style="width:50px; padding:2px;"> 毫秒</div>
+                                </div>
+                                <div style="border:1px solid #ddd; padding:8px; border-radius:6px; text-align:center;">
+                                    <div style="font-weight:bold; font-size:0.85rem; margin-bottom:6px;">擲幣 (🌗)</div>
+                                    <input type="file" id="img-up-toss" accept="image/*,video/*"
+                                        style="width:100%; font-size:0.75rem; margin-bottom:6px;">
+                                    <div style="font-size:0.85rem;">播 <input type="number" id="img-tm-toss" value="2300"
+                                            min="50" step="50" style="width:50px; padding:2px;"> 毫秒</div>
+                                </div>
+                            </div>
+
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:12px;">
+                                <div
+                                    style="border:1px solid #ddd; padding:8px; border-radius:6px; text-align:center; background:#fff;">
+                                    <div style="margin-bottom:6px;"><span class="yin-seal seal-sy"
+                                            style="font-size:0.85em;">少陽</span></div>
+                                    <input type="file" id="img-up-sy" accept="image/*"
+                                        style="width:100%; font-size:0.75rem; margin-bottom:4px;">
+                                    <div style="font-size:0.85rem;"><input type="number" id="img-tm-sy" value="1200"
+                                            min="50" step="50" style="width:50px; padding:2px;"> 毫秒</div>
+                                </div>
+                                <div
+                                    style="border:1px solid #ddd; padding:8px; border-radius:6px; text-align:center; background:#fff;">
+                                    <div style="margin-bottom:6px;"><span class="yin-seal seal-oy"
+                                            style="font-size:0.85em;">老陽</span></div>
+                                    <input type="file" id="img-up-oy" accept="image/*"
+                                        style="width:100%; font-size:0.75rem; margin-bottom:4px;">
+                                    <div style="font-size:0.85rem;"><input type="number" id="img-tm-oy" value="1200"
+                                            min="50" step="50" style="width:50px; padding:2px;"> 毫秒</div>
+                                </div>
+                                <div
+                                    style="border:1px solid #ddd; padding:8px; border-radius:6px; text-align:center; background:#fff;">
+                                    <div style="margin-bottom:6px;"><span class="yin-seal seal-sn"
+                                            style="font-size:0.85em;">少陰</span></div>
+                                    <input type="file" id="img-up-sn" accept="image/*"
+                                        style="width:100%; font-size:0.75rem; margin-bottom:4px;">
+                                    <div style="font-size:0.85rem;"><input type="number" id="img-tm-sn" value="1200"
+                                            min="50" step="50" style="width:50px; padding:2px;"> 毫秒</div>
+                                </div>
+                                <div
+                                    style="border:1px solid #ddd; padding:8px; border-radius:6px; text-align:center; background:#fff;">
+                                    <div style="margin-bottom:6px;"><span class="yin-seal seal-on"
+                                            style="font-size:0.85em;">老陰</span></div>
+                                    <input type="file" id="img-up-on" accept="image/*"
+                                        style="width:100%; font-size:0.75rem; margin-bottom:4px;">
+                                    <div style="font-size:0.85rem;"><input type="number" id="img-tm-on" value="1200"
+                                            min="50" step="50" style="width:50px; padding:2px;"> 毫秒</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            style="border:1px solid #f5c6cb; padding:10px; border-radius:6px; background:#fff3cd; margin-bottom:10px;">
+                            <label
+                                style="font-weight:bold; color:var(--red); font-size:0.9rem; margin:0; display:flex; align-items:center; cursor:pointer;">
+                                <input type="checkbox" id="set-shake" style="transform:scale(1.2); margin-right:8px;">
+                                啟用搖晃手機擲幣功能
+                            </label>
+                        </div>
+
+                        <div style="border:1px solid #ddd; padding:10px; border-radius:6px; background:#fff;">
+                            <div style="font-weight:bold; margin-bottom:8px; font-size:0.9rem; color:#333;">擲幣結束條件</div>
+                            <div style="display:flex; flex-direction:column; gap:8px; font-size:0.85rem;">
+                                <label style="margin:0; display:flex; align-items:center; cursor:pointer;">
+                                    <input type="radio" name="anim-end" value="manual"
+                                        style="margin-right:8px; transform:scale(1.2);"> 點擊畫面以繼續
+                                </label>
+                                <label style="margin:0; display:flex; align-items:center; cursor:pointer;">
+                                    <input type="radio" name="anim-end" value="auto" checked
+                                        style="margin-right:8px; transform:scale(1.2);">
+                                    停留 <input type="number" id="set-end-time" value="1000" min="50" step="50"
+                                        style="width:55px; padding:2px; margin:0 5px; text-align:center;"> 毫秒自動繼續
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+            </details>
+
+            <details
+                style="background: #fffaf4; border-radius:8px; margin-bottom:12px; border:1px solid #ffeeba; box-shadow:0 2px 5px rgba(0,0,0,0.02); overflow:hidden;">
+                <summary class="settings-summary"
+                    style="font-weight:bold; cursor:pointer; background: #faeee3; color: #856404; outline:none; display:flex; justify-content:space-between; align-items:center;">
+                    ☁️ 資料備份與雲端同步
+                </summary>
+                <div style="padding:15px; border-top:1px solid #e1e4e8; background:transparent;">
+                    <div style="font-weight:bold; color:#555; margin-bottom:8px; font-size:0.95rem;">💾 本機備份</div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
+                        <button class="action-btn"
+                            style="background:#198754; margin:0; padding:10px; font-size:0.95rem;"
+                            onclick="exportDataToFile()">匯出備份</button>
+                        <label class="action-btn"
+                            style="background:#ff9800; margin:0; padding:10px; font-size:0.95rem; text-align:center; cursor:pointer;">
+                            匯入備份 <input type="file" id="import-file" style="display:none;"
+                                onchange="importDataFromFile(this)">
+                        </label>
+                    </div>
+
+                    <div style="font-weight:bold; color:#555; margin-bottom:8px; font-size:0.95rem;">🔄 Firebase 預設同步
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
+                        <button class="action-btn"
+                            style="background:#0d6efd; margin:0; padding:10px; font-size:0.95rem;"
+                            onclick="syncToCloud()">立即上傳</button>
+                        <button class="action-btn"
+                            style="background:#6c757d; margin:0; padding:10px; font-size:0.95rem;"
+                            onclick="restoreFromCloud()">雲端還原</button>
+                    </div>
+
+                    <div style="background:#fff; padding:10px; border-radius:6px; border:1px solid #ddd;">
+                        <div style="font-weight:bold; color:#333; margin-bottom:4px; font-size:0.9rem;">🔑 自訂連線 (進階功能)
+                        </div>
+                        <div style="font-size:0.8rem; color:#666; margin-bottom:8px;">輸入您的自訂 Firebase Config 或 Google
+                            試算表 Webhook 網址，將紀錄專屬備份。</div>
+                        <textarea id="custom-db-config" placeholder="在此貼上 JSON 或 Webhook URL..."
+                            style="width:100%; height:60px; padding:8px; border-radius:4px; border:1px solid #ccc; font-family:monospace; font-size:0.8rem; box-sizing:border-box; resize:vertical;"></textarea>
+
+                        <div style="margin-top: 10px; text-align: right;">
+                            <button
+                                onclick="document.getElementById('gas-tutorial-box').style.display = document.getElementById('gas-tutorial-box').style.display === 'none' ? 'block' : 'none';"
+                                style="background:none; border:none; color:#0d6efd; text-decoration:underline; font-size:0.85rem; cursor:pointer; padding:0;">📖
+                                教我如何免費自建專屬雲端</button>
+                        </div>
+
+                        <div id="gas-tutorial-box"
+                            style="display:none; margin-top:10px; padding:12px; background:#e7f1ff; border:1px solid #b8daff; border-radius:6px; font-size:0.85rem; color:#333; line-height:1.5;">
+                            <div style="font-weight:bold; font-size:1rem; margin-bottom:8px; color:#004085;">🎁
+                                隱藏版大補帖：打造專屬 Google 雲端</div>
+                            <div>只需 3 個步驟，就能把 Google 試算表變成你的免費資料庫：</div>
+                            <ol style="padding-left:20px; margin-top:8px; margin-bottom:12px;">
+                                <li style="margin-bottom:6px;">開啟一個全新的 Google 試算表，點擊上方選單 <b>擴充功能 -> Apps Script</b>。
+                                </li>
+                                <li style="margin-bottom:6px;">將編輯器內的程式碼清空，點擊下方按鈕複製專屬程式碼並貼上。</li>
+                                <li style="margin-bottom:6px;">點擊右上角 <b>部署 -> 新增部署作業</b> -> 類型選擇 <b>網頁應用程式</b>。將存取權限設為
+                                    <b>所有人</b>，部署後複製那串 <b>Web App URL</b>，貼到上方輸入框即可！
+                                </li>
+                            </ol>
+                            <div style="display:flex; gap:10px; margin-top:15px;">
+                                <button onclick="copyGasCode()"
+                                    style="flex:1; background:#0d6efd; color:#fff; border:none; padding:8px; border-radius:4px; cursor:pointer; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.1);">📄
+                                    一鍵複製</button>
+                                <button onclick="copyGasTutorial()"
+                                    style="flex:1; background:#198754; color:#fff; border:none; padding:8px; border-radius:4px; cursor:pointer; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.1);">📤
+                                    複製教學</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <div style="margin-top: 20px; margin-bottom: 10px; text-align: center;">
+                <button onclick="resetSettings()"
+                    style="background:transparent; border:1px solid #dc3545; color:#dc3545; padding:6px 15px; border-radius:20px; font-size:0.85rem; cursor:pointer; font-weight:bold; box-shadow:0 2px 4px rgba(220,53,69,0.1);">
+                    ⚠️ 還原所有設定為預設值
+                </button>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="action-btn"
+                    style="flex: 1; background: #6c757d; color: #fff; border: none; margin: 0; padding: 12px; font-size: 1.05rem; font-weight: bold; border-radius: 8px;"
+                    onclick="requestCloseSettings()">返回</button>
+                <button class="action-btn"
+                    style="flex: 2; background: #198754; color: #fff; border: none; margin: 0; padding: 12px; font-size: 1.05rem; font-weight: bold; border-radius: 8px; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.2);"
+                    onclick="saveSettings()">💾 儲存設定</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-confirm-modal" class="ly-modal-overlay" style="display:none; z-index: 100001;">
+        <div class="ly-modal-box">
+            <div class="ly-modal-msg" style="color: #dc3545;">⚠️ 偵測到變更</div>
+
+            <div id="settings-diff-msg"
+                style="font-size:0.9rem; color:#0d6efd; font-weight:bold; background:#e7f1ff; padding:8px; border-radius:4px; margin-bottom:15px; text-align:left; word-break:break-all;">
+            </div>
+
+            <div style="font-size:0.95rem; color:#555; margin-bottom: 20px;">即將返回首頁，請問要如何處理未儲存的設定？</div>
+
+            <div class="ly-modal-btns" style="flex-direction: column; gap: 10px;">
+                <button class="ly-btn-ok" style="background:#198754; padding:12px;" onclick="confirmSaveSettings()">💾
+                    儲存並返回</button>
+                <button class="ly-btn-cancel" style="background:#dc3545; color: #fff; padding:12px;"
+                    onclick="confirmDiscardSettings()">🗑️ 放棄變更</button>
+                <button class="ly-btn-cancel" style="background:#e9ecef; color: #555; padding:12px;"
+                    onclick="confirmContinueSettings()">✏️ 繼續編輯</button>
+            </div>
+        </div>
+    </div>
+
+    <script>window.$ = id => document.getElementById(id);</script>
+    <script src="./tools/localforage.min.js"></script>
+    <script type="module" src="ly_firebase-config.js"></script><!--FireBase使用-->
+    <script src="./ly_storage.js"></script>
+    <script src="./ly_data.js"></script>
+    <script src="./ly_engine.js"></script>
+    <script src="./taiwan_map.js"></script>
+    <script src="./ly_ui.js"></script>
+    <script src="./ly_draw.js"></script>
+
+    <script>
+        // 註冊 Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./ly_sw.js')
+                    .then(registration => {
+                        console.log('Service Worker 註冊成功，範圍：', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('Service Worker 註冊失敗：', error);
+                    });
+            });
+        }
+    </script>
+</body>
+
+</html>
