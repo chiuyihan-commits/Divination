@@ -819,39 +819,50 @@ details[open] .settings-summary::after {
 .ly-dot3 { animation-delay: 0.6s; }  /* 第三個點晚 0.6 秒出現 */
 
 /* ==========================================
-   ★ 開頭畫面專屬轉圈動畫 (太極雙向旋轉)
-
-.splash-spinner {
-    width: 40px; 
-    height: 40px; 
-    border: 4px solid rgba(13, 110, 253, 0.2); 
-    border-top-color: var(--blue-primary, #0d6efd); 
-    border-radius: 50%; 
-    animation: splashSpin 1s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+   ★ 八卦陣佈陣動畫 (支援 2rem 霸氣大字版)
+========================================== */
+.bagua-gua {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    
+    /* ★ 1. 放大容器以容納 2rem 的字 */
+    width: 40px;
+    height: 40px;
+    /* ★ 2. 偏移量必須是寬高的一半 (40/2 = 20)，這樣座標才會完美置中 */
+    margin-top: -20px; 
+    margin-left: -20px;
+    
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    /* ★ 3. 換成你想要的 2rem 大字 */
+    font-size: 2rem;
+    font-weight: bold;
+    opacity: 0; 
+    pointer-events: none;
+    will-change: transform, opacity, color, text-shadow; 
+    animation: guaFadeIn 0.6s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275); 
 }
 
-@keyframes splashSpin { 
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+@keyframes guaFadeIn {
+    0%   { 
+        opacity: 0; 
+        transform: translate(0, 0) scale(0.1); 
+        color: #fff;
+    }
+    60%  { 
+        opacity: 1; 
+        /* ★ 4. 因為 2rem 本身就很大，這裡把放大的 scale 從 1.4 稍微降到 1.2，避免飛出時字體互相打架 */
+        transform: translate(var(--tx), var(--ty)) scale(1.2); 
+        color: var(--gua-color); 
+        text-shadow: 0 0 10px var(--gua-color); 
+    }
+    100% { 
+        opacity: 0.7; 
+        transform: translate(var(--tx), var(--ty)) scale(1); 
+        color: var(--gua-color); 
+        filter: grayscale(30%); 
+    }
 }
-
-
-.splash-taichi {
-    font-size: 28px;
-    color: var(--blue-primary, #000000);
-    /* 刻意讓內圈轉速稍微慢一點 (1.5s)，與外圈 (1s) 形成錯視的視覺層次感 
-    animation: splashSpinReverse 1.5s linear infinite; 
-}
-
-/* 原本的正轉 
-@keyframes splashSpin { 
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-/* ★ 新增：逆時針反轉 
-@keyframes splashSpinReverse {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(-360deg); }
-}
-    ========================================== */
