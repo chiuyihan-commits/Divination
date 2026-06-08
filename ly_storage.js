@@ -24,26 +24,26 @@ const initialState = {
 window.lastHighlightedElements = []; // 儲存上一次被高光的 DOM 節點
 
 // 函式 1：精準拔除舊高光（完全不使用全域 querySelectorAll）
-window.clearAllHighlights = function() {
+window.clearAllHighlights = function () {
     if (window.lastHighlightedElements.length > 0) {
         const classesToRemove = [
-            'yao-highlight', 'same-zhi-highlight', 'year-he-highlight', 
+            'yao-highlight', 'same-zhi-highlight', 'year-he-highlight',
             'sanhe-red', 'sanhe-black', 'sanhe-marker', 'bi-highlight'
         ];
-        
+
         window.lastHighlightedElements.forEach(el => {
             if (el) {
                 // 使用解構運算子一次移除所有相關 class，效率最高
                 el.classList.remove(...classesToRemove);
             }
         });
-        
+
         window.lastHighlightedElements = []; // 釋放記憶體參照
     }
 };
 
 // 函式 2：動態快取當前的高光元素（僅在畫線/排盤結束後，精準掃描一次留作下次清除）
-window.recordCurrentHighlights = function() {
+window.recordCurrentHighlights = function () {
     window.lastHighlightedElements = Array.from(
         document.querySelectorAll('.yao-highlight, .same-zhi-highlight, .year-he-highlight, .sanhe-red, .sanhe-black, .sanhe-marker, .bi-highlight')
     );
@@ -61,7 +61,7 @@ window.AppState = new Proxy(initialState, {
         // A. 畫線與過濾器系統連動
         if (property === 'activeYaoIdx') {
             let filterBar = document.getElementById("rel-filter-bar");
-            
+
             // 💡 核心優化：不管是切換新爻還是取消選取，第一步都先用快取「精準清除」舊高光
             if (typeof window.clearAllHighlights === 'function') {
                 window.clearAllHighlights();
@@ -78,7 +78,7 @@ window.AppState = new Proxy(initialState, {
                 let parts = value.split('_');
                 if (typeof window.drawRelations === 'function') {
                     window.drawRelations(parseInt(parts[1]), parts[0]);
-                    
+
                     // 💡 核心優化：當新關係線畫完、高光貼好後，立刻掃描並記住這次的高光節點
                     if (typeof window.recordCurrentHighlights === 'function') {
                         window.recordCurrentHighlights();
@@ -103,10 +103,10 @@ window.AppState = new Proxy(initialState, {
                 if (typeof window.clearAllHighlights === 'function') {
                     window.clearAllHighlights();
                 }
-                
+
                 let parts = target.activeYaoIdx.split('_');
                 window.drawRelations(parseInt(parts[1]), parts[0]);
-                
+
                 if (typeof window.recordCurrentHighlights === 'function') {
                     window.recordCurrentHighlights();
                 }
@@ -129,7 +129,7 @@ window.AppState = new Proxy(initialState, {
             }
         }
 
-        return true; 
+        return true;
     }
 });
 
@@ -138,13 +138,13 @@ async function loadSettings() {
     if (saved) animCfg = { ...animCfg, ...saved };
 
     // 1. 一般數值與勾選框 (全面加上 if 防呆保護)
-    if ($("img-tm-prep")) $("img-tm-prep").value = animCfg.tmPrep; 
+    if ($("img-tm-prep")) $("img-tm-prep").value = animCfg.tmPrep;
     if ($("img-tm-toss")) $("img-tm-toss").value = animCfg.tmToss;
-    if ($("img-tm-sy")) $("img-tm-sy").value = animCfg.tmSy; 
+    if ($("img-tm-sy")) $("img-tm-sy").value = animCfg.tmSy;
     if ($("img-tm-oy")) $("img-tm-oy").value = animCfg.tmOy;
-    if ($("img-tm-sn")) $("img-tm-sn").value = animCfg.tmSn; 
+    if ($("img-tm-sn")) $("img-tm-sn").value = animCfg.tmSn;
     if ($("img-tm-on")) $("img-tm-on").value = animCfg.tmOn;
-    
+
     if ($("set-shake")) $("set-shake").checked = animCfg.useShake;
     if ($("set-end-time")) $("set-end-time").value = animCfg.endTime;
     if ($("set-south-adjust")) $("set-south-adjust").checked = animCfg.southAdjust || false;
@@ -155,7 +155,7 @@ async function loadSettings() {
     }
 
     // 3. 讀取：擲幣結束條件 (完美防呆版)
-    let savedEndMode = animCfg.endMode || "auto"; 
+    let savedEndMode = animCfg.endMode || "auto";
     let endModeRadio = document.querySelector(`input[name="anim-end"][value="${savedEndMode}"]`);
     if (endModeRadio) {
         endModeRadio.checked = true;
@@ -175,7 +175,7 @@ async function loadSettings() {
     if (modeRadios.length > 0) {
         let savedTossMode = animCfg.tossMode || 'video';
         let tossRadio = document.querySelector(`input[name="toss-mode"][value="${savedTossMode}"]`);
-        
+
         if (tossRadio) tossRadio.checked = true;
         if ($('settings-3d-coin')) $('settings-3d-coin').style.display = savedTossMode === '3d' ? 'block' : 'none';
 
@@ -193,11 +193,11 @@ async function loadSettings() {
     let taichi = document.querySelector('.splash-taichi');
     if (animCfg.customSplashImg && splashContainer) {
         if (taichi) taichi.style.display = 'none'; // 隱藏原本的太極
-        
+
         // 拔除 CSS 動畫與邊框
         splashContainer.style.animation = 'none';
         splashContainer.style.border = 'none';
-        
+
         // 將使用者的 GIF/圖片設為背景
         splashContainer.style.backgroundImage = `url(${animCfg.customSplashImg})`;
         splashContainer.style.backgroundSize = 'contain';
@@ -210,10 +210,10 @@ async function loadSettings() {
 
 async function saveSettings() {
     const timeFields = ['prep', 'toss', 'sy', 'oy', 'sn', 'on'];
-timeFields.forEach(key => {
-    let propName = 'tm' + key.charAt(0).toUpperCase() + key.slice(1);
-    animCfg[propName] = parseFloat($(`img-tm-${key}`).value);
-});
+    timeFields.forEach(key => {
+        let propName = 'tm' + key.charAt(0).toUpperCase() + key.slice(1);
+        animCfg[propName] = parseFloat($(`img-tm-${key}`).value);
+    });
     animCfg.useShake = $("set-shake").checked;
     animCfg.endMode = document.querySelector('input[name="anim-end"]:checked').value;
     animCfg.endTime = parseFloat($("set-end-time").value);
@@ -240,17 +240,17 @@ timeFields.forEach(key => {
     showToast("設定已儲存！"); closeSettings();
 }
 
-window.resetSettings = async function() {
+window.resetSettings = async function () {
     let isOk = await showConfirm("⚠️ 確定要清除所有自訂設定嗎？\n(別擔心，您的「歷史紀錄」會安全保留)");
     if (isOk) {
         // 1. 精準打擊：只刪除「設定檔」的 key，千萬不要用 .clear()！
-        await localforage.removeItem('ly_animCfg'); 
-        
+        await localforage.removeItem('ly_animCfg');
+
         // 如果你未來有存自訂背景圖片等其他 Key，也用 removeItem 單獨刪除
         // await localforage.removeItem('custom_image_key');
 
         if (window.showToast) window.showToast("✅ 已還原預設值！系統將重新載入...");
-        
+
         // 2. 終極魔法：直接重整網頁，保證所有畫面上的輸入框都恢復成 HTML 預設的乾淨狀態
         setTimeout(() => {
             window.location.reload();
@@ -367,8 +367,8 @@ window.showRecords = async function (isReturning = false) {
         let readClass = (i === window.activeRecHighlight) ? "read" : "unread";
 
         // ★ 核心優化 2：只有在手機版時，才組裝滑動事件字串
-        let swipeEvents = isMobile 
-            ? `ontouchstart="handleSwipeStart(event, this, ${i})" ontouchmove="handleSwipeMove(event, this)" ontouchend="handleSwipeEnd(event, this)"` 
+        let swipeEvents = isMobile
+            ? `ontouchstart="handleSwipeStart(event, this, ${i})" ontouchmove="handleSwipeMove(event, this)" ontouchend="handleSwipeEnd(event, this)"`
             : "";
 
         h += `
@@ -407,16 +407,16 @@ window.showRecords = async function (isReturning = false) {
             if (view.scrollHeight > view.clientHeight) {
                 hint.style.display = 'flex'; // 先將 Display 打開
                 hint.style.opacity = '1';    // 剛進畫面時強制亮起提示
-                
+
                 // 同樣啟動 1.5 秒的熄滅倒數
                 if (window.lyScrollTimeout) clearTimeout(window.lyScrollTimeout);
                 window.lyScrollTimeout = setTimeout(() => {
                     hint.style.opacity = '0';
                 }, 1500);
-                
+
             } else {
                 // 如果紀錄很少不用滑，直接隱藏
-                hint.style.display = 'none'; 
+                hint.style.display = 'none';
             }
         }
     }, 50);
@@ -603,98 +603,6 @@ window.handleSwipeEnd = function (e, el) {
     setTimeout(() => { window.isSwiping = false; }, 100);
 };
 
-// ==========================================
-// ★ 歷史紀錄：首頁變身「修改模式」邏輯
-// ==========================================
-// 2. 點擊「取消」：清空表單，收起彈出視窗
-window.cancelEditMode = function () {
-    restorePortalUI();
-    resetPortalForm();
-
-    let portal = document.getElementById("portal-view");
-    portal.classList.remove("edit-modal-mode");
-    portal.style.display = "none";
-    document.getElementById("edit-backdrop").style.display = "none";
-};
-
-// ==========================================
-// ★ 歷史紀錄：首頁變身「修改模式」邏輯
-// ==========================================
-
-// ★ 清空首頁表單 (恢復乾淨狀態)
-window.resetPortalForm = function () {
-    if (document.getElementById("p-question")) document.getElementById("p-question").value = "";
-    for (let i = 0; i < 6; i++) {
-        let sel = document.getElementById("yao-sel-" + i);
-        if (sel) { sel.value = ""; if (typeof updateYaoSeal === 'function') updateYaoSeal(i); }
-    }
-    // 時間歸位
-    let d = new Date();
-    if (document.getElementById("ts-year")) document.getElementById("ts-year").value = d.getFullYear();
-    if (document.getElementById("ts-month")) document.getElementById("ts-month").value = d.getMonth();
-    if (document.getElementById("ts-day")) document.getElementById("ts-day").value = d.getDate();
-    if (document.getElementById("ts-hour")) document.getElementById("ts-hour").value = d.getHours();
-    if (document.getElementById("ts-minute")) document.getElementById("ts-minute").value = d.getMinutes();
-};
-
-
-// 3. 點擊「確認修改」：重新排盤、覆寫存檔、清空首頁、退回紀錄清單
-window.confirmEditMode = async function () {
-    let ls = [];
-    const valMap = { "少陽": 7, "老陽": 9, "少陰": 8, "老陰": 6 };
-
-    // 檢查六爻是否都有選擇
-    for (let i = 0; i < 6; i++) {
-        let sel = document.getElementById("yao-sel-" + i);
-        if (!sel || !sel.value) {
-            if (window.showAlert) window.showAlert(`請確認【${['初爻', '二爻', '三爻', '四爻', '五爻', '上爻'][i]}】已選擇爻象！`);
-            return;
-        }
-        ls.push(valMap[sel.value]);
-    }
-
-    // ★ 修正 1：從 IndexedDB 取得原始紀錄 (r) 以便繼承筆記資料
-    let recs = await localforage.getItem('iching_final_v60') || [];
-    let r = recs[window.editingRecIndex];
-
-    if (typeof process === 'function' && r) {
-        // ★ 修正 2：封裝要保留的筆記與歷史回溯紀錄
-        let preserveNotes = {
-            judge: r.judge || "",
-            feedback: r.feedback || "",
-            note: r.note || "",
-            history: r.history || []
-        };
-
-        // ★ 修正 3：呼叫已更新過的 process 並傳入第三個參數
-        process(ls, "M 手動修改", preserveNotes);
-    }
-
-    // 強制觸發儲存 (覆寫紀錄)
-    if (typeof saveRec === 'function') await saveRec();
-
-    restorePortalUI();
-    resetPortalForm();
-
-    // 💡 關鍵：關閉 Modal 和黑底
-    let portal = document.getElementById("portal-view");
-    if (portal) {
-        portal.classList.remove("edit-modal-mode");
-        portal.style.display = "none";
-    }
-
-    let backdrop = document.getElementById("edit-backdrop");
-    if (backdrop) backdrop.style.display = "none";
-
-    // 隱藏可能跳出來的結果頁，確保留在歷史紀錄列表
-    document.getElementById("result-view").style.display = "none";
-
-    // 重新載入列表
-    if (typeof showRecords === 'function') showRecords();
-
-    if (window.showToast) window.showToast("✅ 紀錄修改成功！");
-};
-
 // ★ 共用：將首頁變身回原樣的函式
 window.restorePortalUI = function () {
     let title = document.getElementById("portal-header-title");
@@ -732,8 +640,16 @@ window.renderHistoryLog = function () {
     let hHtml = `<h4 style="margin: 0 0 12px 0; color: #555; font-size: 1.05em; border-bottom: 1px solid #eee; padding-bottom: 8px;">🕰️ 歷史修改紀錄</h4><div style="display:flex; flex-direction:column; gap:8px;">`;
 
     AppState.curData.history.forEach((h, idx) => {
-        let gName = h.ben.name + (h.ben.name !== h.bian.name ? ' ｜ ' + h.bian.name : '');
+        // 先給本卦名稱
+        let gName = h.ben.name;
+        // 確認有變卦 (h.bian 存在) 且名稱不同時，才加上變卦名稱
+        if (h.bian && h.ben.name !== h.bian.name) {
+            gName += ' ｜ ' + h.bian.name;
+        }
         let timeStr = h.dateStr || "未知時間";
+
+        // ★ 新增：如果快照中有修改紀錄，就組裝成紅色的提示字串
+        let diffHtml = h.diffStr ? `<div style="font-size: 0.85em; color: #dc3545; margin-top: 4px;">📝 變更內容：${h.diffStr}</div>` : '';
 
         hHtml += `
         <div style="display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 8px 10px; border-radius: 4px; border: 1px solid #eee;">
@@ -741,6 +657,7 @@ window.renderHistoryLog = function () {
                 <span style="font-weight: bold; margin-right: 8px; color: #198754;">${idx + 1}.</span>
                 <span style="color: #666; margin-right: 8px;">${timeStr}</span>
                 <span style="font-weight: bold; color: var(--blue-primary);">${gName}</span>
+                ${diffHtml} <!-- ★ 插入修改紀錄 -->
             </div>
             <div style="cursor: pointer; font-size: 1.1em; padding: 4px; transition: transform 0.1s;" onclick="deleteHistoryItem(${idx})" title="刪除此紀錄" onmousedown="this.style.transform='scale(0.9)'" onmouseup="this.style.transform='scale(1)'">🗑️</div>
         </div>`;
@@ -861,10 +778,6 @@ window.editRecSetup = async function (e, idx) {
             </div>
         </div>
 
-        <div style="margin-bottom: 12px; border-top: 1px dashed #ddd; padding-top: 8px;">
-            ${yaoRowsHTML}
-        </div>
-
         <div style="margin-bottom: 12px; text-align:center;">
             <label style="color:#dc3545; font-weight:bold; font-size:0.95rem; cursor:pointer;">
                 <input type="checkbox" id="edit-cb-south-adjust"> 🌏 此卦啟用南半球節氣對沖
@@ -891,7 +804,7 @@ window.editRecSetup = async function (e, idx) {
     let radios = document.getElementsByName("smart-gender");
     radios.forEach(rad => { if (rad.value === r.gender) rad.checked = true; });
     if (!document.querySelector('input[name="smart-gender"]:checked') && radios.length > 0) radios[0].checked = true;
-    
+
     if (document.getElementById("edit-cb-south-adjust")) {
         document.getElementById("edit-cb-south-adjust").checked = r.isSouthAdjust || false;
     }
@@ -912,7 +825,7 @@ window.editRecSetup = async function (e, idx) {
                 document.getElementById("smart-y").value = nums[0];
                 document.getElementById("smart-m").value = parseInt(nums[1]) - 1;
                 document.getElementById("smart-d").value = nums[2];
-                
+
                 let h = parseInt(nums[3]);
                 // 處理 12 小時制的下午與上午轉換
                 if ((r.dateStr.includes("下午") || r.dateStr.toUpperCase().includes("PM")) && h < 12) {
@@ -920,7 +833,7 @@ window.editRecSetup = async function (e, idx) {
                 } else if ((r.dateStr.includes("上午") || r.dateStr.toUpperCase().includes("AM")) && h === 12) {
                     h = 0;
                 }
-                
+
                 document.getElementById("smart-h").value = h;
                 document.getElementById("smart-min").value = nums[4];
             }
@@ -986,10 +899,8 @@ window.editRecSetup = async function (e, idx) {
     btnOk.onclick = async () => {
         try {
             const currentState = getModalState();
-            // 判定：現在視窗的狀態，跟剛打開時一不一樣？
             let hasChanged = JSON.stringify(initialState) !== JSON.stringify(currentState);
 
-            // 如果「完全沒變動」，直接呼叫載入，不產生回溯紀錄！
             if (!hasChanged) {
                 closeMod();
                 if (typeof window.loadRec === 'function') {
@@ -999,9 +910,9 @@ window.editRecSetup = async function (e, idx) {
                 return;
             }
 
-            // --- 以下是確認「有變動」才會執行的儲存與回溯邏輯 ---
             let ls = [];
             const valMap = { "少陽": 7, "老陽": 9, "少陰": 8, "老陰": 6 };
+            const revValMap = { 7: "少陽", 9: "老陽", 8: "少陰", 6: "老陰" };
 
             for (let i = 0; i < 6; i++) {
                 let selVal = document.getElementById("smart-yao-" + i).value;
@@ -1015,9 +926,20 @@ window.editRecSetup = async function (e, idx) {
             let oldRec = r;
             let history = oldRec.history || [];
 
-            // 製作備份並拔掉內層的 history 避免無限遞迴肥大
+            // ★ 計算修改了什麼爻
+            let diffs = [];
+            let yaoNames = ['初爻', '二爻', '三爻', '四爻', '五爻', '上爻'];
+            for (let i = 0; i < 6; i++) {
+                if (oldRec.lines[i] !== ls[i]) {
+                    diffs.push(`${yaoNames[i]}: ${revValMap[oldRec.lines[i]]}→${revValMap[ls[i]]}`);
+                }
+            }
+            let diffStr = diffs.length > 0 ? diffs.join(", ") : "僅修改時間或問題";
+
+            // 製作備份並寫入修改紀錄
             let snapshot = JSON.parse(JSON.stringify(oldRec));
             delete snapshot.history;
+            snapshot.diffStr = diffStr;
             history.push(snapshot);
 
             // 同步回首頁底層表單供排盤引擎使用
@@ -1033,17 +955,25 @@ window.editRecSetup = async function (e, idx) {
                 if (portalEl && portalEl.tagName === 'SELECT') portalEl.value = smartVal;
             });
 
-            // ★ 核心：賦予最高權限的暫存變數
             if (document.getElementById("edit-cb-south-adjust")) {
                 window.tempEditSouthAdjust = document.getElementById("edit-cb-south-adjust").checked;
             }
 
-            // 重新排盤
+            // ==========================================
+            // ★ 核心修正：只在這裡呼叫一次 process
+            // 傳入 oldRec.method (維持原本起卦方式)
+            // 如果你原本的代碼有 preserveNotes，請加在第三個參數！
+            // ==========================================
             if (typeof process === 'function') {
-                process(ls, "M 手動修改");
+                let preserveNotes = {
+                    judge: oldRec.judge || "",
+                    feedback: oldRec.feedback || "",
+                    note: oldRec.note || "",
+                    history: history // 這裡放入剛剛 push 過 snapshot 的新 history
+                };
+                process(ls, oldRec.method, preserveNotes); 
             }
-            
-            // ★ 算完立刻銷毀，避免污染其他新起卦
+
             window.tempEditSouthAdjust = undefined;
 
             // 繼承歷史紀錄與筆記
@@ -1062,7 +992,6 @@ window.editRecSetup = async function (e, idx) {
             if (typeof window.loadRec === 'function') {
                 window.loadRec(window.editingRecIndex);
             } else {
-                // 防呆備案：強制切換畫面
                 window.comesFromRecords = true;
                 document.getElementById("records-view").style.display = "none";
                 document.getElementById("portal-view").style.display = "none";
