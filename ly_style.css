@@ -1773,39 +1773,16 @@ details[open] .settings-summary::after {
     }
 
     /* ★ 黃金 8 欄分割法 (伏神寬裕版 + 干支最大化) */
-    .gua-table th:nth-child(1) {
-        width: 9%;
-    }
+    .gua-table th:nth-child(1) { width: 9%; }
+    .gua-table th:nth-child(2) { width: 16%; }
+    .gua-table th:nth-child(3) { width: 9%; }
+    .gua-table th:nth-child(4) { width: 9%; }
+    .gua-table th:nth-child(5) { width: 16%; }
+    .gua-table th:nth-child(6) { width: 16%; }
+    .gua-table th:nth-child(7) { width: 16%; }
+    .gua-table th:nth-child(8) { width: 9%; }
 
-    .gua-table th:nth-child(2) {
-        width: 9%;
-    }
-
-    .gua-table th:nth-child(3) {
-        width: 16%;
-    }
-
-    .gua-table th:nth-child(4) {
-        width: 9%;
-    }
-
-    .gua-table th:nth-child(5) {
-        width: 16%;
-    }
-
-    .gua-table th:nth-child(6) {
-        width: 16%;
-    }
-
-    .gua-table th:nth-child(7) {
-        width: 16%;
-    }
-
-    .gua-table th:nth-child(8) {
-        width: 9%;
-    }
-
-    /* ★ 針對六親、六獸的自適應縮小 (整合自底部的重複區塊) */
+    /* ★ 針對六親、六獸的自適應縮小 */
     .gua-table td:nth-child(1),
     .gua-table td:nth-child(2),
     .gua-table td:nth-child(4),
@@ -1817,15 +1794,16 @@ details[open] .settings-summary::after {
         text-overflow: ellipsis;
     }
 
-    /* ★ 干支欄位與 3~4 字印章自適應防爆設定 */
+    /* ⬇️ 【修正 1】改回 Grid，讓第一欄 (爻線) 獨自置中，不受世應影響 */
     .ben-wrapper {
-        display: grid;
-        grid-template-columns: 24px 14px 12px;
-        align-items: center;
-        justify-items: center;
-        justify-content: center;
-        gap: 3px;
-        width: 100%;
+        display: grid !important;
+        grid-template-columns: 1fr 14px 12px; /* 爻線佔滿剩餘空間(1fr)，世應和OX保留固定空間 */
+        align-items: center !important;
+        justify-items: center !important;
+        gap: 2px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: hidden;
     }
 
     .gua-table td:nth-child(3),
@@ -1874,14 +1852,14 @@ details[open] .settings-summary::after {
         background: #f0f0f0;
         border: 1px solid #999;
         font-size: 0.8rem;
-        padding: 4px 0;
+        padding: 4px 1px !important; /* ⬇️ 【修正 2】縮減左右 padding，榨出空間 */
         color: #333;
     }
 
     .gua-table td {
         border: 1px solid #bbb;
         height: 40px;
-        padding: 4px 0;
+        padding: 4px 1px !important; /* ⬇️ 【修正 2】縮減左右 padding，榨出空間 */
         text-align: center;
         vertical-align: middle;
         font-size: 0.95rem;
@@ -1893,8 +1871,11 @@ details[open] .settings-summary::after {
         font-size: 0.85rem;
     }
 
+    /* ⬇️ 【修正 2】爻線寬度改為 100%，由 Grid 的 1fr 來決定絕對置中 */
     .yao-bar {
-        width: 24px;
+        width: 100% !important;
+        max-width: 30px !important;
+        min-width: 16px !important;
         height: 6px;
         margin: 1px 0;
     }
@@ -1904,25 +1885,33 @@ details[open] .settings-summary::after {
     }
 
     .y-b {
-        display: flex;
-        justify-content: space-between;
+        display: flex !important;
+        justify-content: space-between !important;
     }
 
+    /* ⬇️ 【修正 4】斷線寬度改為百分比，保持爻線比例不變形 */
     .y-b span {
-        width: 9px;
+        width: 42% !important;
         height: 100%;
         background: #000;
     }
 
+    /* ⬇️ 【修正 5】微調世應與動變符號的佔位空間與彈性縮放 */
     .sy-mark {
-        font-size: 0.8rem;
+        font-size: 0.8em !important;
         color: #6f42c1;
         font-weight: bold;
+        min-width: 12px !important;
+        text-align: center;
+        flex-shrink: 1; /* 允許在極端窄螢幕下微縮 */
     }
 
-    /* 手機版：動爻 ○ / × 標籤 (統一引用全局 .move-mark，僅微調大小) */
+    /* 手機版：動爻 ○ / × 標籤 */
     .move-mark {
-        font-size: 1.05rem;
+        font-size: 0.8em !important;
+        min-width: 12px !important;
+        text-align: center;
+        flex-shrink: 1; /* 允許在極端窄螢幕下微縮 */
     }
 
     .fu-small {
@@ -2530,3 +2519,28 @@ details[open] .settings-summary::after {
 .btn-diff-save { background: #198754; padding: 12px; }
 .btn-diff-discard { background: #dc3545; color: #fff; padding: 12px; }
 .btn-diff-continue { background: #e9ecef; color: #555; padding: 12px; }
+
+/* ==========================================
+   ★ 新增：連環相生流動型箭頭樣式與動畫
+========================================== */
+@keyframes shengFlow {
+    to {
+        stroke-dashoffset: -20;
+    }
+}
+
+/* 套用在 SVG 連環生線條上的 Class */
+.flowing-line {
+    stroke: #ffc107 !important; /* 能量金黃色 */
+    stroke-width: 4.5px !important; /* 比一般線條稍粗，更顯眼 */
+    stroke-dasharray: 8, 4; /* 虛線比例：線長8, 間隔4 */
+    animation: shengFlow 1.2s linear infinite; /* 讓虛線無限循環往前流動 */
+}
+
+/* 連環生專屬的文字標籤樣式 */
+.flowing-label {
+    fill: #d39e00 !important;
+    font-weight: bold !important;
+    font-size: 1.1rem !important;
+    background-color: rgba(255, 255, 255, 0.9);
+}
