@@ -13,6 +13,20 @@ if (!getApps().length) {
 const db = getFirestore(app);
 
 // 指定文件 ID (可依需求更改為特定使用者 ID)
+const userDocRef = doc(db, "user_sync", "main_profile");// ★ 新增：將內建 KEY 是否存在的狀態，暴露給外面的 UI 系統
+window.hasBuiltInFirebaseKey = (firebaseConfig && Object.keys(firebaseConfig).length > 0);
+
+// 在這裡初始化 app
+let app;
+if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
+} else {
+    app = getApp();
+}
+
+const db = getFirestore(app);
+
+// 指定文件 ID (可依需求更改為特定使用者 ID)
 const userDocRef = doc(db, "user_sync", "main_profile");
 
 // ★ 核心同步路由 (上傳)
@@ -159,6 +173,16 @@ window.initRealTimeSync = (onDataChange) => {
 
 // ★ 安全版：打包資料並過濾不需要上傳的肥大圖片
 window.syncToCloud = async function() {
+    // ⛔ 核心攔截：直接從資料庫讀取同步設定
+    let isAutoSync = await localforage.getItem('ly_autoSync');
+    if (isAutoSync === null) isAutoSync = true; // 預設為開啟
+
+    // 如果自動同步被關閉，且「不是」手動強制備份，就阻擋上傳
+    if (!isAutoSync && !isManual) {
+        console.log("☁️ 雲端自動同步已關閉，本次變更僅儲存於本機。");
+        return; 
+    }
+
     // 檢查 Firebase 貨車是否已經準備好
     if (typeof window.uploadEverything !== 'function') {
         console.warn("Firebase 模組尚未載入完成，本次暫不上傳雲端。");
@@ -179,3 +203,8 @@ window.syncToCloud = async function() {
         settings: settingsToUpload
     });
 };
+
+// ★ 新增：模組與 KEY 載入完成後，主動通知 UI 重新掃描一次開關狀態
+if (typeof window.checkCloudKeyStatus === 'function') {
+    window.checkCloudKeyStatus();
+}
