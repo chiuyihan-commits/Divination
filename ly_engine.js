@@ -52,7 +52,7 @@ async function initApp() {
 
     // ★ 核心優化 1：確保在初始化時，等待「設定」與「歷史紀錄」載入完畢
     if (typeof loadSettings === 'function') await loadSettings();
-    if (typeof showRecords === 'function') await showRecords();
+    //if (typeof showRecords === 'function') await showRecords();
 
     // 產生六個手動選擇爻的 UI
     let manualRowsHTML = "";
@@ -107,23 +107,23 @@ async function initApp() {
     if ($("portal-view")) $("portal-view").style.display = "block";
     if ($("records-view")) $("records-view").style.display = "none";
     if ($("result-view")) $("result-view").style.display = "none";
-    
+
     // =========================================
     // ★ 魔法 2：在準備關閉開頭動畫之前，等待計時器跑完！
-    await minSplashTime; 
+    await minSplashTime;
     // =========================================
-    
+
     // ★ 核心優化 2：一切準備就緒後，將開頭載入畫面（Splash Screen）淡出銷毀
     const splash = document.getElementById('ly-splash-screen');
     if (splash) {
         // 先把透明度歸零 (觸發 CSS transition 淡出)
         splash.style.opacity = '0';
-        
+
         // 等待淡出動畫 (0.4秒) 播完後，徹底將它隱藏，避免擋住點擊
-        setTimeout(() => { 
-            splash.style.visibility = 'hidden'; 
-            splash.style.display = 'none'; 
-        }, 400); 
+        setTimeout(() => {
+            splash.style.visibility = 'hidden';
+            splash.style.display = 'none';
+        }, 400);
     }
 }
 
@@ -133,22 +133,16 @@ window.onload = initApp;
 function process(ls, method, preserveNotes = null) {
     AppState.curRecIndex = -1;
     let bazi, timeNote = "", jieQiInfo = null, dateObj = null;
-    // ★ 修正：因為現在時間與干支都在彈出視窗中，我們強制系統永遠讀取視窗內的設定
     let useCustomTime = true;
-
     let isSouthAdjust = false;
 
     if (window.tempEditSouthAdjust !== undefined) {
-        // 優先權 1：正在修改「歷史紀錄」時，強制採用該紀錄的狀態
         isSouthAdjust = window.tempEditSouthAdjust;
     } else if ($("cb-south-adjust") && $("south-adjust-wrapper").style.display !== "none") {
-        // 優先權 2：首頁 GPS 偵測到南半球，跳出的臨時勾選框
         isSouthAdjust = $("cb-south-adjust").checked;
     } else if ($("modal-cb-south-adjust") && $("modal-south-adjust-wrapper").style.display !== "none") {
-        // 優先權 3：自訂時位彈出視窗的臨時勾選框
         isSouthAdjust = $("modal-cb-south-adjust").checked;
     } else {
-        // 優先權 4：上述都沒有，則吃系統設定的「全域常駐值」
         isSouthAdjust = window.animCfg ? (window.animCfg.southAdjust || false) : false;
     }
 
@@ -187,8 +181,8 @@ function process(ls, method, preserveNotes = null) {
     AppState.curData = {
         ...res,
         isSouthAdjust: isSouthAdjust,
-        lines: ls, // 記住原始爻
-        najiaValue: najia, // 記住選單值
+        lines: ls,
+        najiaValue: najia,
         fushenValue: fushen,
         bianViewValue: bianView,
         method,
@@ -199,19 +193,23 @@ function process(ls, method, preserveNotes = null) {
         fushen: $("set-fushen").options[$("set-fushen").selectedIndex].text,
         showCi: $("set-show-ci").value === "1",
         question: $("p-question").value,
+        subject: (preserveNotes && preserveNotes.subject) ? preserveNotes.subject : "", // ★ 補上這行
         judge: (preserveNotes && preserveNotes.judge) ? preserveNotes.judge : "",
         feedback: (preserveNotes && preserveNotes.feedback) ? preserveNotes.feedback : "",
         note: (preserveNotes && preserveNotes.note) ? preserveNotes.note : "",
         history: (preserveNotes && preserveNotes.history) ? preserveNotes.history : []
     };
 
-    // 同步到結果頁頂端選單
     $("res-set-najia").value = najia;
     $("res-set-fushen").value = fushen;
     $("res-set-bian").value = bianView;
 
-    renderRes();
+    // ★ 修復核心：移除 pushState，標記非紀錄進入，並交給 Hash Router 處理畫面
+    window.comesFromRecords = false;
     window.hasUnsavedChanges = true;
+    window.location.hash = "#result";
+
+    renderRes();
 }
 
 function startManual() {
@@ -232,15 +230,40 @@ function startManual() {
 }
 
 function startAuto() {
-    let ls = [];
+    // ★ 微創 1：防呆檢查
+    let hasManualInput = false;
     for (let i = 0; i < 6; i++) {
-        let c = 0;
-        for (let j = 0; j < 3; j++) {
-            if (Math.random() > 0.5) c++;
-        }
-        ls.push([6, 7, 8, 9][c]);
+        let sel = document.getElementById("yao-sel-" + i);
+        if (sel && sel.value !== "") hasManualInput = true;
     }
-    process(ls, "A 電腦起卦");
+    // 如果起爻進度大於 0，也算是有手動輸入
+    if (window.AppState && window.AppState.currentCastStep > 0) hasManualInput = true;
+
+    // 定義原本的核心運算
+    const executeAuto = () => {
+        let ls = [];
+        for (let i = 0; i < 6; i++) {
+            let c = 0;
+            for (let j = 0; j < 3; j++) {
+                if (Math.random() > 0.5) c++;
+            }
+            ls.push([6, 7, 8, 9][c]);
+        }
+        process(ls, "A 電腦起卦");
+    };
+
+    // ★ 微創 2：如果發現有手動痕跡，跳出詢問
+    if (hasManualInput) {
+        window.showConfirm("⚠️ 警告：目前卦盤已有手動起卦進度。\n\n確定要放棄當前輸入，改由電腦重新起卦嗎？\n(此動作將清空目前的盤面)").then(ok => {
+            if (ok) {
+                // 術後清空：呼叫你寫好的清空 UI 函數
+                if (typeof window.resetManualUI === 'function') window.resetManualUI();
+                executeAuto();
+            }
+        });
+    } else {
+        executeAuto(); // 盤面乾淨，直接起卦
+    }
 }
 
 // ==========================================
@@ -1031,9 +1054,9 @@ window.renderRes = function () {
         headerHTML = `
         <div id="bazi-anchor" class="mobile-info-wrapper" style="scroll-margin-top: 65px; padding:5px 4px; background:#fff; border-bottom:1px solid #ddd; margin-bottom:4px;">
            
-            <div style="font-weight:bold; text-align:center; font-size:1.05em; color:#333; margin-bottom:2px;">
-                ${AppState.curData.dateStr}
-                ${(AppState.curData.method || "預設手動起卦").slice(2)}
+            <div style="font-weight:bold; text-align:center; font-size:1.05em; color:#333; margin-bottom:2px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <span>${AppState.curData.dateStr} ${(AppState.curData.method || "預設手動起卦").slice(2)}</span>
+                <button onclick="copyResultAsText()" style="padding: 2px 6px; font-size: 0.8rem; background: #6c757d; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-family: inherit;">📋 複製</button>
             </div>
             
             ${southBadgeMobile}
@@ -1092,7 +1115,10 @@ window.renderRes = function () {
         <div id="bazi-anchor" style="display: flex; justify-content: space-between; align-items: stretch; width: 100%; border-bottom: 1px solid #ddd; padding-bottom: 8px; margin-bottom: 10px;">
             <div class="classic-info" style="flex: 1; padding-right: 15px; border-right: 1px dashed #eee;">
                 性別：<span>${AppState.curData.gender}</span><br>西元 <span>${AppState.curData.dateStr}</span><br>
-                <span style="color:var(--red); font-weight:bold;">${(AppState.curData.method || "預設手動起卦").slice(2)}</span>
+                <span style="color:var(--red); font-weight:bold; display: inline-flex; align-items: center; gap: 8px;">
+                    ${(AppState.curData.method || "預設手動起卦").slice(2)}
+                    <button onclick="copyResultAsText()" style="padding: 2px 6px; font-size: 0.85rem; background: #6c757d; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-family: inherit;">📋 複製</button>
+                </span>
                 
                 ${southBadgeDesktop}<br>
                 
@@ -1221,10 +1247,11 @@ window.renderRes = function () {
 
     let html = "";
     if (isMobileMode) {
-        document.querySelector(".gua-table thead").innerHTML = `<tr><th>六獸</th><th>伏神</th><th>六親</th><th>本卦</th><th>干支</th><th>變卦</th><th>變親</th></tr>`;
+        // ★ 新增「伏親」欄位
+        document.querySelector(".gua-table thead").innerHTML = `<tr><th>伏親</th><th>伏神</th><th>六獸</th><th>六親</th><th>本卦</th><th>干支</th><th>變卦</th><th>變親</th></tr>`;
     } else {
-        // ★ 微調欄位比例，給中間的箭頭 (8%) 多一點伸展空間
-        document.querySelector(".gua-table thead").innerHTML = `<tr><th width="8%">六獸</th><th width="14%">伏神</th><th width="35%">【 本 卦 】(點干支看關係)</th><th width="8%"></th><th width="35%">【 變 卦 】</th></tr>`;
+        // ★ 電腦版也獨立抽出「伏親」
+        document.querySelector(".gua-table thead").innerHTML = `<tr><th width="6%">伏親</th><th width="12%">伏神</th><th width="32%"><th width="8%">六獸</th>【 本 卦 】(點干支看關係)</th><th width="8%"></th><th width="34%">【 變 卦 】</th></tr>`;
     }
 
     let showBianRule = AppState.curData.bianViewValue;
@@ -1239,24 +1266,32 @@ window.renderRes = function () {
         // 💡 如果這個爻「沒有發動」，我們幫它加上專屬的隱藏 class
         let staticBianClass = (!r.move) ? "ly-static-bian" : "";
         let tgtHtml = buildGzBlock(r.gz, r.status, `yao-tgt-${i}`, true);
+        // 💡 提取伏神的六親字串
+        let fuRelText = r.fuRel ? r.fuRel.substr(0, 2) : "";
         let fuHtml = "", fuHtmlDesk = "";
 
         if (r.fuGz) {
-            // ★ 呼叫專屬伏神排版函式
-            let fuBlock = buildFuBlock(r.fuGz, r.fuRel, r.fuKp, `yao-fu-${i}`);
-            if (isMobileMode) fuHtml = fuBlock; // 移除多餘的字
+            // ★ 核心修正：廢棄 buildFuBlock，直接套用一般干支的 buildGzBlock，讓天干五行比照一般爻位顯示！
+            let fuBlock = buildGzBlock(r.fuGz, r.fuKp, `yao-fu-${i}`, true);
+            if (isMobileMode) fuHtml = fuBlock;
             else fuHtmlDesk = fuBlock;
         }
 
         let barHtml = (r.bar === "solid") ? `<div class="yao-bar y-s"></div>` : `<div class="yao-bar y-b"><span></span><span></span></div>`;
+
+        // ★ 修正 1：給空的世應一個佔位盒子 (寬度對應 CSS)
+        let syMark = r.shi ? `<div class="sy-mark">${r.shi}</div>` : `<div style="width:14px; height:14px;"></div>`;
+
+        /// ★ 使用幾何圓圈 ○ 與數學乘號 × 來提升質感
+        let moveMark = r.move ? `<div class="move-mark">${r.move.includes("O") ? "○" : "×"}</div>` : `<div style="width:12px;"></div>`;
+
         let barHtmlDesk = (r.bar === "solid") ? `<div class="y-solid"></div>` : `<div class="y-broken"><span></span><span></span></div>`;
-        let syMark = r.shi ? `<div class="sy-mark">${r.shi}</div>` : `<div style="height:14px"></div>`;
+
         let deskShi = r.shi ? `<span class="${r.shi === '世' ? 'marker-shi' : 'marker-ying'}">${r.shi}</span>` : `<span style="display:inline-block;width:16px;"></span>`;
-        let moveMark = r.move ? `<div class="move-mark">${r.move.includes("O") ? "O" : "X"}</div>` : "";
 
-        // ★ 呼叫 CSS 裡的懸浮箭頭
-        let moveDisplay = r.move ? `<div class="desk-move-box"><span class="desk-move-mark">${r.move.includes("O") ? "O" : "X"}</span><div class="desk-long-arrow"></div></div>` : "";
 
+        // 電腦版的長箭頭旁邊的符號也同步更換
+        let moveDisplay = r.move ? `<div class="desk-move-box"><span class="desk-move-mark">${r.move.includes("O") ? "○" : "×"}</span><div class="desk-long-arrow"></div></div>` : "";
         let bianGan = "", bianQin = "", bianContentHtml = "";
         if (showThisBian && r.bgz) {
             let bBlock = buildGzBlock(r.bgz, r.bstatus, `yao-src-${i}`, true);
@@ -1271,20 +1306,26 @@ window.renderRes = function () {
             }
         }
 
-        // ★ 完全修復變數錯誤，並完美套用寬度控制類別
+        // ★ 完全修復變數錯誤，並完美套用寬度控制類別與直書樣式
         if (isMobileMode) {
+            // 定義統一的直書放大樣式
+            const verticalStyle = `style="writing-mode: vertical-rl; text-orientation: upright; font-size: 1.1rem !important; font-weight: bold; text-align: center; padding: 4px 2px; vertical-align: middle;"`;
+            const verticalStyleGray = `style="writing-mode: vertical-rl; text-orientation: upright; font-size: 1.1rem !important; font-weight: bold; text-align: center; padding: 4px 2px; vertical-align: middle; color: #666;"`;
+
             html += `<tr>
-                <td class="beast-col">${r.bst}</td>
-                <td class="col-fu">${fuHtml}</td>
-                <td class="col-rel" style="font-size:0.9rem;"><b>${r.rel.substr(0, 2)}</b></td>
+                <td class="col-rel" ${verticalStyleGray}>${fuRelText}</td>
+                <td>${fuHtml}</td>
+                <td class="beast-col" ${verticalStyle}>${r.bst}</td>
+                <td class="col-rel" ${verticalStyle}>${r.rel.substr(0, 2)}</td>
                 <td><div class="ben-wrapper">${barHtml}${syMark}${moveMark}</div></td>
                 <td>${tgtHtml}</td>
                 <td class="${staticBianClass}">${bianGan}</td>
-                <td class="col-rel ${staticBianClass}">${bianQin}</td>
+                <td class="col-rel ${staticBianClass}" ${verticalStyle}>${r.bgz ? r.br.substr(0, 2) : ''}</td>
             </tr>`;
         } else {
             html += `<tr>
                 <td>${r.bst}</td>
+                <td class="col-rel text-gray" style="font-size:0.9em; font-weight:bold;">${fuRelText}</td> <!-- ★ 新增：獨立伏親 -->
                 <td class="col-fu">${fuHtmlDesk}</td>
                 <td class="text-center">
                     <div class="desk-yao-row">
@@ -1402,76 +1443,209 @@ window.renderRes = function () {
 
     $("extra-prompts").innerHTML = promptsHTML;
     if (AppState.curData.showCi) renderCi(); else $("ci-area").style.display = "none";
-    // 填寫欄位內容
-    $("edit-judge").value = AppState.curData.judge || "";
-    $("edit-feedback").value = AppState.curData.feedback || "";
-    $("edit-note").value = AppState.curData.note || "";
 
-    // ★ 唯讀與按鈕顯示邏輯
+    // 填寫欄位內容
+    if ($("edit-subject")) $("edit-subject").value = AppState.curData.subject || ""; // ★ 補上這行，主旨就讀出來了！
+    if ($("edit-judge")) $("edit-judge").value = AppState.curData.judge || "";
+    if ($("edit-feedback")) $("edit-feedback").value = AppState.curData.feedback || "";
+    if ($("edit-note")) $("edit-note").value = AppState.curData.note || "";
+
+    // ★ 唯讀與按鈕顯示邏輯 (已修復：加入主旨，且新盤也預設上鎖)
     let isHistory = window.comesFromRecords || AppState.curRecIndex > -1;
-    let jEl = $("edit-judge"), fEl = $("edit-feedback"), nEl = $("edit-note");
+    
+    // ★ 1. 加入 sEl (主旨)
+    let sEl = $("edit-subject"), jEl = $("edit-judge"), fEl = $("edit-feedback"), nEl = $("edit-note");
     let eBtn = $("btn-edit-notes"), uBtn = $("btn-update-rec");
 
-    let tablePanel = document.getElementById("details-table"); // 抓取理氣大表
-    let notesPanel = document.querySelector(".edit-area") ? document.querySelector(".edit-area").closest("details") : null; // 透過內層元素精準反查筆記區
-    let isEditingNotes = uBtn && uBtn.style.display !== "none";// 檢查現在是否正在「編輯模式」(更新按鈕顯示中)
+    let tablePanel = document.getElementById("details-table"); 
+    let notesPanel = document.querySelector(".edit-area") ? document.querySelector(".edit-area").closest("details") : null; 
+    let isEditingNotes = uBtn && (uBtn.style.display === "inline-block" || uBtn.style.display === "block");
 
-    if (isHistory && !isEditingNotes) {
-        // 歷史紀錄狀態
-        [jEl, fEl, nEl].forEach(el => {
-            if (el) { el.readOnly = true; el.style.backgroundColor = "#e9ecef"; el.style.color = "#666"; el.style.borderColor = "#ddd"; }
+    // ★ 2. 關鍵修改：不管是不是歷史紀錄，只要不在編輯狀態，一律上鎖！
+    if (!isEditingNotes) {
+        [sEl, jEl, fEl, nEl].forEach(el => {
+            if (el) { 
+                el.readOnly = true; 
+                el.style.backgroundColor = "transparent"; 
+                el.style.color = "#555"; 
+                el.style.borderColor = "transparent"; 
+                el.style.boxShadow = "none";
+            }
         });
-        if (eBtn) eBtn.style.display = "inline-block";
-        if (uBtn) uBtn.style.display = "none";
+        if (eBtn) eBtn.style.display = "inline-block"; // 顯示編輯筆
+        if (uBtn) uBtn.style.display = "none";         // 隱藏更新按鈕
 
-        // ⬇️ 紀錄頁面下方區塊收合判定。
-        if (tablePanel) tablePanel.open = false; // 預設開啟大表
-        if (notesPanel) notesPanel.open = true; // 預設開啟筆記
-    } else if (!isHistory || isEditingNotes) {
-        // 剛起完新卦狀態，或正在編輯歷史筆記中
-        [jEl, fEl, nEl].forEach(el => {
+        if (tablePanel) tablePanel.open = false; 
+        if (notesPanel) notesPanel.open = true; 
+    } else {
+        // 解鎖狀態
+        [sEl, jEl, fEl, nEl].forEach(el => {
             if (el) {
                 el.readOnly = false;
                 el.style.backgroundColor = "#fff";
                 el.style.color = "#000";
-                // 若正在編輯紀錄，維持藍色邊框提示
-                el.style.borderColor = isEditingNotes ? "#80bdff" : "#ccc";
+                el.style.borderColor = "#80bdff";
             }
         });
-
-
-        if (!isHistory) {
-            if (eBtn) eBtn.style.display = "none";
-            if (uBtn) uBtn.style.display = "none";
-        }
-
+        if (eBtn) eBtn.style.display = "none";
+        // ★ 3. 新盤不准顯示更新紀錄按鈕，交給上方的儲存按鈕
+        if (uBtn) uBtn.style.display = isHistory ? "inline-block" : "none";
+        
         if (tablePanel && !isHistory) tablePanel.open = false;
         if (notesPanel && !isHistory) notesPanel.open = true;
     }
+    
     if (typeof window.renderHistoryLog === 'function') {
         window.renderHistoryLog();
     }
-}
+} // <--- 這裡是 window.renderRes 的結尾大括號！
 
 // 點擊「編輯」按鈕時觸發
 window.enableNotesEdit = function (e) {
     if (e) e.preventDefault();
 
-    let jEl = $("edit-judge"), fEl = $("edit-feedback"), nEl = $("edit-note");
-    [jEl, fEl, nEl].forEach(el => {
+    // ★ 4. 加入 sEl (主旨)
+    let sEl = $("edit-subject"), jEl = $("edit-judge"), fEl = $("edit-feedback"), nEl = $("edit-note");
+    [sEl, jEl, fEl, nEl].forEach(el => {
         if (el) {
             el.readOnly = false;
             el.style.backgroundColor = "#fff";
             el.style.color = "#000";
-            el.style.borderColor = "#80bdff"; // 給個藍色邊框提示可編輯
+            el.style.borderColor = "#80bdff"; 
             el.style.boxShadow = "0 0 0 0.2rem rgba(0,123,255,.25)";
         }
     });
 
     // 切換按鈕
-    $("btn-edit-notes").style.display = "none";
-    if ($("btn-update-rec")) $("btn-update-rec").style.display = "inline-block";
+    if ($("btn-edit-notes")) $("btn-edit-notes").style.display = "none";
+    
+    let uBtn = $("btn-update-rec");
+    if (uBtn) {
+        // ★ 5. 確保剛排完的新盤，點了編輯也不會跑出更新按鈕
+        uBtn.style.display = (window.comesFromRecords || AppState.curRecIndex >= 0) ? "inline-block" : "none";
+    }
 
-    // 將游標自動移到第一個輸入框
-    if (jEl) jEl.focus();
+    // 將游標自動移到主旨
+    if (sEl) sEl.focus();
+    else if (jEl) jEl.focus();
 };
+
+// ==========================================
+// ★ 排盤結果轉換為純文字複製功能 (最終對齊與設定連動版)
+// ==========================================
+window.copyResultAsText = function() {
+    let d = AppState.curData;
+    if (!d || !d.lines) {
+        if (window.showToast) window.showToast("⚠️ 沒有可複製的排盤資料！");
+        return;
+    }
+
+    const padZW = (str, len) => {
+        let s = str || "";
+        while (s.length < len) s += " ";
+        return s;
+    };
+
+    const ZhiList = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
+    let k1_idx = (10 - d.bazi.dG + d.bazi.dZ) % 12; if (k1_idx < 0) k1_idx += 12;
+    let k2_idx = (11 - d.bazi.dG + d.bazi.dZ) % 12; if (k2_idx < 0) k2_idx += 12;
+    let kongwang = ZhiList[k1_idx] + ZhiList[k2_idx];
+
+    let lines = [];
+    lines.push("========== 六爻排盤 ==========");
+    if (d.question) lines.push(`占問事項：${d.question}`);
+    lines.push(`起卦時間：${d.dateStr} ${d.solarNote || ''}`);
+    lines.push(`起卦方式：${(d.method || "").slice(2) || "手動起卦"}`);
+    lines.push(`八字干支：${d.bazi.Y}年 ${d.bazi.M}月 ${d.bazi.D}日 ${d.bazi.H}時`);
+    lines.push(`當日空亡：${kongwang}`);
+    lines.push("");
+
+    const getShiStr = (name, shi) => {
+        if (shi === 6) return "八純卦";
+        return ['', '一', '二', '三', '四', '五', '八純'][shi] + '世卦';
+    };
+
+    let isGuaChanged = d.ben.name !== d.bian.name;
+    if (isGuaChanged) {
+        lines.push(`【本卦】${d.ben.gong}宮 ${getShiStr(d.ben.name, d.ben.shi)}：${d.ben.name} → 【變卦】${d.bian.gong}宮 ${getShiStr(d.bian.name, d.bian.shi)}：${d.bian.name}`);
+    } else {
+        lines.push(`【本卦】${d.ben.gong}宮 ${getShiStr(d.ben.name, d.ben.shi)}：${d.ben.name}`);
+    }
+    lines.push("");
+
+    lines.push("伏  神 六獸 【本  卦】     【變  卦】");
+
+    // ★ 抓取目前的 UI 設定：僅顯動爻 (move) 或 全顯變爻 (all)
+    let bianViewMode = document.getElementById('res-set-bian') ? document.getElementById('res-set-bian').value : "move";
+
+    // ★ 核心修正：從 rows[0] (上爻) 往下印到 rows[5] (初爻)，確保不會頭下腳上！
+    for (let i = 0; i <= 5; i++) {
+        let r = d.rows[i];
+        
+        let fuStr = padZW(r.fuGz ? (r.fuRel.substr(0, 2) + r.fuGz) : "", 5);
+        let bst = padZW(r.bst, 2);
+        
+        let shiStr = r.shi ? r.shi : " ";
+        let relFull = r.rel || "";
+        if (relFull.length <= 2 && r.gz) relFull += r.gz; 
+        let benStr = padZW(shiStr + relFull, 6);
+        
+        let yaoSym = (r.bar === "solid") ? "━━━" : "━ ━";
+        let moveSym = r.move ? (r.move.includes("O") ? "○" : "✕") : " ";
+        let centerStr = `${yaoSym} ${moveSym}`;
+
+        // ★ 變卦顯示邏輯連動：若無變卦或選擇不顯示，就維持乾淨的空白
+        let bianStr = ""; 
+        if (isGuaChanged) {
+            let shouldShowBian = (bianViewMode === "all" || r.move);
+            if (shouldShowBian && r.bgz) {
+                let bShiStr = r.bShi ? r.bShi : " ";
+                let brFull = r.br || "";
+                if (brFull.length <= 2 && r.bgz) brFull += r.bgz;
+                bianStr = `→ ${bShiStr}${brFull}`;
+            } else {
+                bianStr = `       `; // 隱藏變卦時保持寬度
+            }
+        }
+
+        lines.push(`${fuStr} ${bst} ${benStr} ${centerStr} ${bianStr}`);
+    }
+    lines.push("==============================");
+
+    let finalTxt = lines.join("\n");
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(finalTxt).then(() => {
+            if (window.showToast) window.showToast("📋 排盤結果已成功複製！");
+        }).catch(err => {
+            console.error("複製失敗", err);
+            fallbackCopyTextToClipboard(finalTxt);
+        });
+    } else {
+        fallbackCopyTextToClipboard(finalTxt);
+    }
+};
+
+// 傳統剪貼簿降級方案
+function fallbackCopyTextToClipboard(text) {
+    let ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.top = "0";
+    ta.style.left = "0";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try {
+        let successful = document.execCommand("copy");
+        if (successful && window.showToast) {
+            window.showToast("📋 排盤結果已成功複製！");
+        } else if (window.showAlert) {
+            window.showAlert("您的瀏覽器不支援自動複製，請手動圈選複製。");
+        }
+    } catch(err) {
+        if (window.showAlert) window.showAlert("複製失敗，請手動複製。");
+    }
+    document.body.removeChild(ta);
+}
