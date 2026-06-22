@@ -11,18 +11,19 @@
 
 <body>
     <div id="ly-splash-screen">
-        <div id="splash-title">六爻排盤</div>
+        <div id="splash-title" style="transform: translateY(-20px);">六爻排盤</div>
         <div id="taichi-container">
             <div class="splash-spinner"></div>
             <div class="splash-taichi">☯</div>
             <div id="bagua-ring"></div>
         </div>
         <div id="splash-status" class="ly-mystic-text">
-            <span class="ly-dot3">.</span><span class="ly-dot2">.</span><span class="ly-dot1">.</span>道法感應中<span class="ly-dot1">.</span><span class="ly-dot2">.</span><span class="ly-dot3">.</span>
+            <span class="ly-dot3">.</span><span class="ly-dot2">.</span><span class="ly-dot1">.</span>道法感應中<span
+                class="ly-dot1">.</span><span class="ly-dot2">.</span><span class="ly-dot3">.</span>
         </div>
 
         <script>
-            (function() {
+            (function () {
                 function updateSplashLayout() {
                     const splash = document.getElementById('ly-splash-screen');
                     if (splash) {
@@ -42,28 +43,28 @@
                             }
                             let ring = document.getElementById('bagua-ring');
                             if (ring) {
-                                const C_METAL = '#e6a23c', C_WOOD = '#198754', C_WATER = '#0d6efd', C_FIRE = '#dc3545', C_EARTH = '#8B4513'; 
+                                const C_METAL = '#e6a23c', C_WOOD = '#198754', C_WATER = '#0d6efd', C_FIRE = '#dc3545', C_EARTH = '#8B4513';
                                 const earlyHeaven = [
-                                    { char: '☰', order: 1, color: C_METAL }, { char: '☴', order: 5, color: C_WOOD }, 
-                                    { char: '☵', order: 6, color: C_WATER }, { char: '☶', order: 7, color: C_EARTH }, 
-                                    { char: '☷', order: 8, color: C_EARTH }, { char: '☳', order: 4, color: C_WOOD }, 
-                                    { char: '☲', order: 3, color: C_FIRE }, { char: '☱', order: 2, color: C_METAL }  
+                                    { char: '☰', order: 1, color: C_METAL }, { char: '☴', order: 5, color: C_WOOD },
+                                    { char: '☵', order: 6, color: C_WATER }, { char: '☶', order: 7, color: C_EARTH },
+                                    { char: '☷', order: 8, color: C_EARTH }, { char: '☳', order: 4, color: C_WOOD },
+                                    { char: '☲', order: 3, color: C_FIRE }, { char: '☱', order: 2, color: C_METAL }
                                 ];
                                 const laterHeaven = [
-                                    { char: '☲', order: 3, color: C_FIRE }, { char: '☷', order: 4, color: C_EARTH }, 
-                                    { char: '☱', order: 5, color: C_METAL }, { char: '☰', order: 6, color: C_METAL }, 
-                                    { char: '☵', order: 7, color: C_WATER }, { char: '☶', order: 8, color: C_EARTH }, 
-                                    { char: '☳', order: 1, color: C_WOOD }, { char: '☴', order: 2, color: C_WOOD }  
+                                    { char: '☲', order: 3, color: C_FIRE }, { char: '☷', order: 4, color: C_EARTH },
+                                    { char: '☱', order: 5, color: C_METAL }, { char: '☰', order: 6, color: C_METAL },
+                                    { char: '☵', order: 7, color: C_WATER }, { char: '☶', order: 8, color: C_EARTH },
+                                    { char: '☳', order: 1, color: C_WOOD }, { char: '☴', order: 2, color: C_WOOD }
                                 ];
                                 const isEarly = Math.random() > 0.5;
                                 const currentBagua = isEarly ? earlyHeaven : laterHeaven;
-                                const radius = 85; 
+                                const radius = 85;
                                 let fragment = document.createDocumentFragment();
                                 currentBagua.forEach((gua, index) => {
                                     let el = document.createElement('div');
                                     el.className = 'bagua-gua';
                                     el.innerText = gua.char;
-                                    let angle = (index * 45) - 90; 
+                                    let angle = (index * 45) - 90;
                                     let rad = angle * Math.PI / 180;
                                     let x = Math.cos(rad) * radius;
                                     let y = Math.sin(rad) * radius;
@@ -88,14 +89,24 @@
         <div class="card home-card">
             <div id="portal-header-title" class="portal-header home-title">六爻排盤</div>
 
-            <div class="master-switch-area gender-switch-area">
-                性別：
-                <label><input type="radio" name="gender" value="男" checked>男</label> 
-                <label class="gender-label-female"><input type="radio" name="gender" value="女">女</label>
+            <div class="master-switch-area gender-switch-area"
+                style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    性別：
+                    <label><input type="radio" name="gender" value="男" checked>男</label>
+                    <label class="gender-label-female"><input type="radio" name="gender" value="女">女</label>
+                </div>
+                <div id="auto-sync-container-home" style="display: none; align-items: center; font-size: 0.9rem;">
+                    <span style="margin-right: 6px; color: #555; font-weight: bold;">雲端同步</span>
+                    <label class="switch" style="transform: scale(0.75); margin: 0;">
+                        <input type="checkbox" id="set-auto-sync-home" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
             </div>
 
             <div id="portal-msg" class="sys-msg-text"></div>
-            
+
             <div id="south-adjust-wrapper" class="south-adjust-box">
                 <label class="danger-checkbox-label">
                     <input type="checkbox" id="cb-south-adjust"> 🌏 啟用南半球節氣對沖 (月建對沖)
@@ -182,7 +193,8 @@
 
             <div class="switch-container switch-container-time">
                 <div id="sw-true" class="switch-btn switch-active switch-btn-time" onclick="setMode(true)">西元時間</div>
-                <div id="sw-false" class="switch-btn switch-inactive switch-btn-time" onclick="setMode(false)">干支四柱</div>
+                <div id="sw-false" class="switch-btn switch-inactive switch-btn-time" onclick="setMode(false)">干支四柱
+                </div>
             </div>
 
             <div id="mode-true">
@@ -242,12 +254,16 @@
                     </div>
 
                     <div class="row-group ts-row-group">
-                        <div class="input-wrapper"><label>東經</label><input type="number" id="ts-lon" value="121.5"><span class="unit">度</span></div>
-                        <div class="input-wrapper"><label>北緯</label><input type="number" id="ts-lat" value="25.0"><span class="unit">度</span></div>
+                        <div class="input-wrapper"><label>東經</label><input type="number" id="ts-lon" value="121.5"><span
+                                class="unit">度</span></div>
+                        <div class="input-wrapper"><label>北緯</label><input type="number" id="ts-lat" value="25.0"><span
+                                class="unit">度</span></div>
                     </div>
                     <div class="row-group ts-row-group">
-                        <div class="input-wrapper"><label>時差</label><input type="number" id="ts-zone" value="-480"><span class="unit">分</span></div>
-                        <div class="input-wrapper"><label>高度</label><input type="number" id="ts-alt" value="0"><span class="unit">m</span></div>
+                        <div class="input-wrapper"><label>時差</label><input type="number" id="ts-zone" value="-480"><span
+                                class="unit">分</span></div>
+                        <div class="input-wrapper"><label>高度</label><input type="number" id="ts-alt" value="0"><span
+                                class="unit">m</span></div>
                     </div>
 
                     <div id="modal-south-adjust-wrapper">
@@ -270,19 +286,23 @@
                 <div class="ganzhi-grid">
                     <div class="ganzhi-col">
                         <div class="ganzhi-label">時</div>
-                        <div class="gz-select-group"><select id="gz-h-gan" class="gz-sel"></select><select id="gz-h-zhi" class="gz-sel"></select></div>
+                        <div class="gz-select-group"><select id="gz-h-gan" class="gz-sel"></select><select id="gz-h-zhi"
+                                class="gz-sel"></select></div>
                     </div>
                     <div class="ganzhi-col">
                         <div class="ganzhi-label">日</div>
-                        <div class="gz-select-group"><select id="gz-d-gan" class="gz-sel"></select><select id="gz-d-zhi" class="gz-sel"></select></div>
+                        <div class="gz-select-group"><select id="gz-d-gan" class="gz-sel"></select><select id="gz-d-zhi"
+                                class="gz-sel"></select></div>
                     </div>
                     <div class="ganzhi-col">
                         <div class="ganzhi-label">月</div>
-                        <div class="gz-select-group"><select id="gz-m-gan" class="gz-sel"></select><select id="gz-m-zhi" class="gz-sel"></select></div>
+                        <div class="gz-select-group"><select id="gz-m-gan" class="gz-sel"></select><select id="gz-m-zhi"
+                                class="gz-sel"></select></div>
                     </div>
                     <div class="ganzhi-col">
                         <div class="ganzhi-label">年</div>
-                        <div class="gz-select-group"><select id="gz-y-gan" class="gz-sel"></select><select id="gz-y-zhi" class="gz-sel"></select></div>
+                        <div class="gz-select-group"><select id="gz-y-gan" class="gz-sel"></select><select id="gz-y-zhi"
+                                class="gz-sel"></select></div>
                     </div>
                 </div>
             </div>
@@ -294,14 +314,38 @@
     <div id="result-view">
         <svg id="rel-svg" class="rel-svg-canvas">
             <defs>
-                <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#198754" /></marker>
-                <marker id="arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#dc3545" /></marker>
-                <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#0d6efd" /></marker>
-                <marker id="arrow-purple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#6f42c1" /></marker>
-                <marker id="arrow-gold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#e6a23c" /></marker>
-                <marker id="arrow-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#6c757d" /></marker>
-                <marker id="arrow-brown" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8B4513" /></marker>
-                <marker id="arrow-dark" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#343a40" /></marker>
+                <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#198754" />
+                </marker>
+                <marker id="arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc3545" />
+                </marker>
+                <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#0d6efd" />
+                </marker>
+                <marker id="arrow-purple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#6f42c1" />
+                </marker>
+                <marker id="arrow-gold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#e6a23c" />
+                </marker>
+                <marker id="arrow-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#6c757d" />
+                </marker>
+                <marker id="arrow-brown" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#8B4513" />
+                </marker>
+                <marker id="arrow-dark" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                    orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#343a40" />
+                </marker>
             </defs>
             <g id="rel-lines"></g>
         </svg>
@@ -325,7 +369,7 @@
                     <option value="all">全顯變爻</option>
                 </select>
             </div>
-            <div>
+            <div style="display: flex; gap: 5px;">
                 <button onclick="saveRec()" class="nav-btn-save">儲存</button>
             </div>
         </div>
@@ -337,28 +381,37 @@
             <thead></thead>
             <tbody id="gua-tbody"></tbody>
         </table>
-        
+
         <div id="score-detail-box"></div>
         <div id="rel-filter-bar" class="filter-bar" style="display:none;"></div>
         <div id="extra-prompts"></div>
         <div id="ci-area" class="ci-container" style="display:none;"></div>
-        
+
         <details class="notes-section" open>
             <summary class="notes-summary" onclick="event.stopPropagation()">
                 <span class="notes-summary-title">📝 占斷與筆記</span>
-                <div class="notes-action-btns"> 
-                    <button id="btn-edit-notes" class="action-btn btn-notes-action" onclick="enableNotesEdit(event)">✏️ 編輯</button>
-                    <button id="btn-update-rec" class="action-btn btn-notes-action" onclick="updateCurrentRec()">💾 更新紀錄</button>
+                <div class="notes-action-btns">
+                    <button id="btn-edit-notes" class="action-btn btn-notes-action" onclick="enableNotesEdit(event)">✏️
+                        編輯</button>
+                    <button id="btn-update-rec" class="action-btn btn-notes-action" onclick="updateCurrentRec()">💾
+                        更新紀錄</button>
                 </div>
             </summary>
             <div class="edit-area">
+                <div class="edit-box">
+                    <label class="edit-label">主旨：</label>
+                    <textarea id="edit-subject" class="edit-input edit-input-subject" placeholder="請輸入紀錄主旨..." rows="1"
+                        style="font-weight: bold; color: #0d6efd; resize: none; overflow: hidden; padding-top: 8px; padding-bottom: 8px; line-height: 1.5;"
+                        oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'"></textarea>
+                </div>
                 <div class="edit-box">
                     <label class="edit-label">占斷結果：</label>
                     <textarea id="edit-judge" class="edit-input edit-input-judge" placeholder="請輸入您的解卦判斷..."></textarea>
                 </div>
                 <div class="edit-box">
                     <label class="edit-label">事後回饋：</label>
-                    <textarea id="edit-feedback" class="edit-input edit-input-feedback" placeholder="請輸入實際發生的結果..."></textarea>
+                    <textarea id="edit-feedback" class="edit-input edit-input-feedback"
+                        placeholder="請輸入實際發生的結果..."></textarea>
                 </div>
                 <div class="edit-box edit-box-last">
                     <label class="edit-label">備註：</label>
@@ -375,14 +428,14 @@
             <div class="records-nav-spacer"></div>
         </div>
         <div id="rec-list-container"></div>
-        
+
         <div id="scroll-hint" class="scroll-hint-box">
             <div class="scroll-hint-arrows"><span>▲</span><span>▼</span></div>
             上下滑動
         </div>
     </div>
 
-    <div id="anim-overlay">
+    <div id="anim-overlay" class="anim-full-overlay">
         <div id="anim-msg"></div>
         <div id="anim-main-content">
             <img id="anim-img" src="">
@@ -408,8 +461,9 @@
                         <div class="set-map-row">
                             <span class="set-main-text">🗺️ 離線圖資擴充</span>
                             <label class="action-btn set-sub-text btn-import-map">
-                                ➕ 匯入地圖 
-                                <input type="file" id="import-geojson" accept=".json" style="display:none;" onchange="handleGeoJsonUpload(this)">
+                                ➕ 匯入地圖
+                                <input type="file" id="import-geojson" accept=".json" style="display:none;"
+                                    onchange="handleGeoJsonUpload(this)">
                             </label>
                         </div>
                         <div id="map-list-container">
@@ -427,7 +481,8 @@
                 <div class="settings-content settings-content-green">
                     <div class="set-subtitle">✨ 自訂專屬開場圖</div>
                     <div class="set-upload-row">
-                        <input type="file" id="upload-splash" accept="image/gif, image/jpeg, image/png" class="set-upload-input">
+                        <input type="file" id="upload-splash" accept="image/gif, image/jpeg, image/png"
+                            class="set-upload-input">
                         <button onclick="clearCustomSplash()" class="btn-clear-img">🗑️ 清除圖片</button>
                     </div>
                     <div class="set-hint-text">※ 限制 200KB 以下 (支援 GIF/PNG/JPG)</div>
@@ -436,7 +491,8 @@
                         <div class="set-subtitle">擲幣視覺模式</div>
                         <div class="set-radio-group">
                             <label class="set-radio-label">
-                                <input type="radio" name="toss-mode" value="video" checked class="set-radio-input"> 傳統影片/GIF
+                                <input type="radio" name="toss-mode" value="video" checked class="set-radio-input">
+                                傳統影片/GIF
                             </label>
                             <label class="set-radio-label">
                                 <input type="radio" name="toss-mode" value="3d" class="set-radio-input"> 3D 模擬硬幣
@@ -462,38 +518,49 @@
                                 <div class="anim-img-box anim-img-box-blue">
                                     <div class="anim-img-title">準備 (🙏)</div>
                                     <input type="file" id="img-up-prep" accept="image/*,video/*" class="anim-img-input">
-                                    <div class="anim-img-time">播 <input type="number" id="img-tm-prep" value="200" min="50" step="50" class="anim-img-time-input"> 毫秒</div>
+                                    <div class="anim-img-time">播 <input type="number" id="img-tm-prep" value="200"
+                                            min="50" step="50" class="anim-img-time-input"> 毫秒</div>
                                 </div>
                                 <div class="anim-img-box">
                                     <div class="anim-img-title">擲幣 (🌗)</div>
                                     <input type="file" id="img-up-toss" accept="image/*,video/*" class="anim-img-input">
-                                    <div class="anim-img-time">播 <input type="number" id="img-tm-toss" value="2300" min="50" step="50" class="anim-img-time-input"> 毫秒</div>
+                                    <div class="anim-img-time">播 <input type="number" id="img-tm-toss" value="2300"
+                                            min="50" step="50" class="anim-img-time-input"> 毫秒</div>
                                 </div>
                             </div>
                             <div class="anim-img-grid-4">
                                 <div class="anim-img-box">
                                     <div class="anim-img-title-seal"><span class="yin-seal seal-sy">少陽</span></div>
                                     <input type="file" id="img-up-sy" accept="image/*" class="anim-img-input-4">
-                                    <div class="anim-img-time"><input type="number" id="img-tm-sy" value="1200" min="50" step="50" class="anim-img-time-input"> 毫秒</div>
+                                    <div class="anim-img-time"><input type="number" id="img-tm-sy" value="1200" min="50"
+                                            step="50" class="anim-img-time-input"> 毫秒</div>
                                 </div>
                                 <div class="anim-img-box">
                                     <div class="anim-img-title-seal"><span class="yin-seal seal-oy">老陽</span></div>
                                     <input type="file" id="img-up-oy" accept="image/*" class="anim-img-input-4">
-                                    <div class="anim-img-time"><input type="number" id="img-tm-oy" value="1200" min="50" step="50" class="anim-img-time-input"> 毫秒</div>
+                                    <div class="anim-img-time"><input type="number" id="img-tm-oy" value="1200" min="50"
+                                            step="50" class="anim-img-time-input"> 毫秒</div>
                                 </div>
                                 <div class="anim-img-box">
                                     <div class="anim-img-title-seal"><span class="yin-seal seal-sn">少陰</span></div>
                                     <input type="file" id="img-up-sn" accept="image/*" class="anim-img-input-4">
-                                    <div class="anim-img-time"><input type="number" id="img-tm-sn" value="1200" min="50" step="50" class="anim-img-time-input"> 毫秒</div>
+                                    <div class="anim-img-time"><input type="number" id="img-tm-sn" value="1200" min="50"
+                                            step="50" class="anim-img-time-input"> 毫秒</div>
                                 </div>
                                 <div class="anim-img-box">
                                     <div class="anim-img-title-seal"><span class="yin-seal seal-on">老陰</span></div>
                                     <input type="file" id="img-up-on" accept="image/*" class="anim-img-input-4">
-                                    <div class="anim-img-time"><input type="number" id="img-tm-on" value="1200" min="50" step="50" class="anim-img-time-input"> 毫秒</div>
+                                    <div class="anim-img-time"><input type="number" id="img-tm-on" value="1200" min="50"
+                                            step="50" class="anim-img-time-input"> 毫秒</div>
                                 </div>
                             </div>
                         </div>
-
+                        <div id="reset-coins-container" class="reset-coins-box"
+                            style="text-align: center; margin: 15px 0;display: none;">
+                            <button class="action-btn"
+                                style="background: #6c757d; color: #fff; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+                                onclick="restoreDefaultCoins()">🔄 還原擲筊與硬幣預設圖片</button>
+                        </div>
                         <div class="shake-setting-box">
                             <label class="shake-setting-label">
                                 <input type="checkbox" id="set-shake" class="shake-setting-input"> 啟用搖晃手機擲幣功能
@@ -507,8 +574,9 @@
                                     <input type="radio" name="anim-end" value="manual" class="anim-end-input"> 點擊畫面以繼續
                                 </label>
                                 <label class="anim-end-label">
-                                    <input type="radio" name="anim-end" value="auto" checked class="anim-end-input"> 停留 
-                                    <input type="number" id="set-end-time" value="1000" min="50" step="50" class="anim-end-time-input"> 毫秒自動繼續
+                                    <input type="radio" name="anim-end" value="auto" checked class="anim-end-input"> 停留
+                                    <input type="number" id="set-end-time" value="1000" min="50" step="50"
+                                        class="anim-end-time-input"> 毫秒自動繼續
                                 </label>
                             </div>
                         </div>
@@ -523,23 +591,41 @@
                     <div class="sync-grid">
                         <button class="action-btn btn-export" onclick="exportDataToFile()">匯出備份</button>
                         <label class="action-btn btn-import">
-                            匯入備份 <input type="file" id="import-file" style="display:none;" onchange="importDataFromFile(this)">
+                            匯入備份 <input type="file" id="import-file" style="display:none;"
+                                onchange="importDataFromFile(this)">
                         </label>
                     </div>
-
                     <div class="sync-subtitle">🔄 Firebase 預設同步</div>
+                    <div id="auto-sync-container-settings" class="setting-item flex-between"
+                        style="padding: 0 0 15px 0; border-bottom: 1px solid #ffceb3; display: none; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: bold; color: #d35400; font-size: 1.05rem;">☁️ 雲端自動同步</div>
+                            <div style="font-size: 0.85rem; color: #e67e22; margin-top: 4px;">開啟時，紀錄變更將自動上傳</div>
+                        </div>
+                        <label class="switch" style="margin-left: 15px;">
+                            <input type="checkbox" id="set-auto-sync-settings" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div id="built-in-key-hint"
+                        style="display: none; color: #198754; font-size: 0.85rem; margin-top: 5px; font-weight: bold;">
+                        ✅ 系統已載入專屬內建連線！。
+                    </div>
                     <div class="sync-grid">
-                        <button class="action-btn btn-sync-up" onclick="syncToCloud()">立即上傳</button>
+                        <button class="action-btn btn-sync-up" onclick="window.syncToCloud(true)">立即上傳</button>
                         <button class="action-btn btn-sync-down" onclick="restoreFromCloud()">雲端還原</button>
                     </div>
 
                     <div class="advanced-db-box">
                         <div class="advanced-db-title">🔑 自訂連線 (進階功能)</div>
                         <div class="advanced-db-desc">輸入您的自訂 Firebase Config 或 Google 試算表 Webhook 網址，將紀錄專屬備份。</div>
-                        <textarea id="custom-db-config" class="advanced-db-input" placeholder="在此貼上 JSON 或 Webhook URL..."></textarea>
+                        <textarea id="custom-db-config" class="advanced-db-input"
+                            placeholder="在此貼上 JSON 或 Webhook URL..."></textarea>
 
                         <div class="gas-tutorial-btn-box">
-                            <button onclick="document.getElementById('gas-tutorial-box').style.display = document.getElementById('gas-tutorial-box').style.display === 'none' ? 'block' : 'none';" class="btn-gas-tutorial">📖 教我如何免費自建專屬雲端</button>
+                            <button
+                                onclick="document.getElementById('gas-tutorial-box').style.display = document.getElementById('gas-tutorial-box').style.display === 'none' ? 'block' : 'none';"
+                                class="btn-gas-tutorial">📖 教我如何免費自建專屬雲端</button>
                         </div>
 
                         <div id="gas-tutorial-box">
@@ -548,7 +634,9 @@
                             <ol class="gas-tutorial-list">
                                 <li class="gas-tutorial-li">開啟一個全新的 Google 試算表，點擊上方選單 <b>擴充功能 -> Apps Script</b>。</li>
                                 <li class="gas-tutorial-li">將編輯器內的程式碼清空，點擊下方按鈕複製專屬程式碼並貼上。</li>
-                                <li class="gas-tutorial-li">點擊右上角 <b>部署 -> 新增部署作業</b> -> 類型選擇 <b>網頁應用程式</b>。將存取權限設為 <b>所有人</b>，部署後複製那串 <b>Web App URL</b>，貼到上方輸入框即可！</li>
+                                <li class="gas-tutorial-li">點擊右上角 <b>部署 -> 新增部署作業</b> -> 類型選擇 <b>網頁應用程式</b>。將存取權限設為
+                                    <b>所有人</b>，部署後複製那串 <b>Web App URL</b>，貼到上方輸入框即可！
+                                </li>
                             </ol>
                             <div class="gas-tutorial-action-box">
                                 <button onclick="copyGasCode()" class="btn-gas-copy-code">📄 一鍵複製</button>
