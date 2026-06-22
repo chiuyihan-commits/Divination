@@ -18,6 +18,15 @@ const initialState = {
     currentCastStep: 0        // 手動起爻進行到的步驟 (0~5)
 };
 
+// 當你成功將卦盤存入資料庫後，務必加上這兩行更新系統認知：
+window.comesFromRecords = true;
+window.recordNotesSnapshot = JSON.stringify({
+    subject: document.getElementById("edit-subject")?.value || "", // ★ 加入這行
+    judge: document.getElementById("edit-judge")?.value || "",
+    feedback: document.getElementById("edit-feedback")?.value || "",
+    note: document.getElementById("edit-note")?.value || ""
+});
+
 // ==========================================
 // ★ 效能優化：全域高亮元素快取追蹤器
 // ==========================================
@@ -115,9 +124,10 @@ window.AppState = new Proxy(initialState, {
 
         if (property === 'availableRels') {
             const btnMap = {
-                '全': '.btn-all', '無': '.btn-none', '生': '.btn-sheng',
+                '全+': '.btn-all-plus', '全': '.btn-all', '明': '.btn-ming',
+                '無': '.btn-none', '生': '.btn-sheng', '生⁺': '.btn-chain-sheng',
                 '剋': '.btn-ke', '沖': '.btn-chong', '合': '.btn-he',
-                '墓': '.btn-mu', '比': '.btn-bi'
+                '比': '.btn-bi', '墓': '.btn-mu', '形墓': '.btn-xingmu'
             };
             for (let [relName, selector] of Object.entries(btnMap)) {
                 let btn = document.querySelector(selector);
@@ -266,73 +276,112 @@ window.setRelFilter = (filter) => {
 async function saveRec() {
     let recs = await localforage.getItem('iching_final_v60') || [];
 
-    // 1. 將輸入框的內容寫入當前狀態
-    AppState.curData.judge = $("edit-judge").value;
-    AppState.curData.feedback = $("edit-feedback").value;
-    AppState.curData.note = $("edit-note").value;
+    // 1. 將輸入框的內容寫入當前狀態 (★ 新增抓取主旨)
+    AppState.curData.subject = document.getElementById("edit-subject")?.value || "";
+    AppState.curData.judge = document.getElementById("edit-judge")?.value || "";
+    AppState.curData.feedback = document.getElementById("edit-feedback")?.value || "";
+    AppState.curData.note = document.getElementById("edit-note")?.value || "";
 
-    // ★ 核心修正：深度複製！將目前的卦象資料「徹底影印一份」，準備存進資料庫
+    // ★ 智能比對：如果已經有這筆紀錄，比對有沒有實際改動
+    let isChanged = true;
+    if (AppState.curRecIndex > -1) {
+        let oldStr = JSON.stringify(recs[AppState.curRecIndex]);
+        let newStr = JSON.stringify(AppState.curData);
+        if (oldStr === newStr) isChanged = false;
+    }
+
+    // ★ 若無異動，跳通知並直接中斷後續的存檔
+    if (!isChanged) {
+        if (window.showToast) window.showToast("✅ 沒有異動");
+        window.hasUnsavedChanges = false;
+        return;
+    }
+
+    // 2. 深度複製
     let cloneData = JSON.parse(JSON.stringify(AppState.curData));
 
     if (AppState.curRecIndex > -1) {
         recs[AppState.curRecIndex] = cloneData;
-        showToast("紀錄已更新");
+        if (window.showToast) window.showToast("💾 紀錄已更新");
     } else {
         recs.unshift(cloneData);
         AppState.curRecIndex = 0;
-        showToast("已存入紀錄庫");
+        if (window.showToast) window.showToast("💾 已存入紀錄庫");
     }
 
     await localforage.setItem('iching_final_v60', recs);
 
-    // ★ 增加這個 typeof 檢查，如果 Firebase 沒載入好就不會噴錯
     if (typeof window.uploadEverything === 'function') {
         syncToCloud();
     } else {
         console.log("Firebase 尚未載入，稍後自動同步。");
     }
+
+    // 更新系統記憶
     window.hasUnsavedChanges = false;
+    window.comesFromRecords = true;
+
+    // 拍下最新的筆記快照 (包含 subject)
+    let s = document.getElementById("edit-subject")?.value || "";
+    let j = document.getElementById("edit-judge")?.value || "";
+    let f = document.getElementById("edit-feedback")?.value || "";
+    let n = document.getElementById("edit-note")?.value || "";
+    window.recordNotesSnapshot = JSON.stringify({ subject: s, judge: j, feedback: f, note: n });
 }
 
 // ==========================================
-// ★ 讀取單筆紀錄 (加入已讀標記與捲軸記憶)
+// ★ 讀取單筆紀錄 (加入已讀標記與完美路由時序)
 // ==========================================
 window.loadRec = async function (i) {
-    window.activeRecHighlight = i; // ★ 更新高亮索引
-    // ★ 點擊卡片時，記住目前的捲動位置
+    // 1. 記住現在歷史列表的捲軸位置
     let recView = document.getElementById("records-view");
     if (recView) window.lastRecScroll = recView.scrollTop;
 
+    // 2. 等待資料庫讀取完成 (這步有時間差，必須先做)
     let recs = await localforage.getItem('iching_final_v60') || [];
 
-    // ★ 如果是第一次點開，標記為已讀並存檔
     if (!recs[i].isRead) {
         recs[i].isRead = true;
         await localforage.setItem('iching_final_v60', recs);
     }
 
+    // 3. 更新記憶體資料
+    window.activeRecHighlight = i;
     AppState.curRecIndex = i;
     let loadedData = JSON.parse(JSON.stringify(recs[i]));
     AppState.curData = loadedData;
 
+    // 4. 設定畫面上方選單
     if (loadedData.najiaValue) document.getElementById("res-set-najia").value = loadedData.najiaValue;
     if (loadedData.fushenValue) document.getElementById("res-set-fushen").value = loadedData.fushenValue;
     if (loadedData.bianViewValue) document.getElementById("res-set-bian").value = loadedData.bianViewValue;
 
+    // 5. 隱藏更新按鈕並標記狀態
+    let uBtn = document.getElementById("btn-update-rec");
+    if (uBtn) uBtn.style.display = "none";
     window.comesFromRecords = true;
     window.hasUnsavedChanges = false;
 
+    // 6. 先將資料渲染到畫面上 (填滿文字框)
     if (typeof renderRes === 'function') renderRes();
-    document.getElementById("records-view").style.display = "none";
+
+    // 7. ★ 核心修復：所有資料跟畫面都準備好後，最後才發送 Hash 切換給 Router！
+    // 這樣 Router 一進來就能拍到最完美的筆記快照，再也不會誤判了。
+    window.location.hash = "#result";
 };
 
 // ==========================================
 // ★ 歷史紀錄：列表渲染 (修復 guaNameDisplay 錯誤與樣式優化)
 // ==========================================
 window.showRecords = async function (isReturning = false) {
+    if (window.location.hash !== "#records") {
+        window.location.hash = "#records";
+        return;
+    }
+
     if (!isReturning) {
         window.lastRecScroll = 0;
-        window.activeRecHighlight = -1; // ★ 核心修正 2：每次從首頁進入時，清空高亮狀態
+        window.activeRecHighlight = -1;
     }
 
     document.getElementById("portal-view").style.display = "none";
@@ -346,11 +395,8 @@ window.showRecords = async function (isReturning = false) {
         .rec-actions { display: flex; flex-direction: row; position: absolute; right: 0; top: 0; bottom: 0; width: 160px; z-index: 1; }
         .rec-actions button { border: none; color: white; font-weight: bold; cursor: pointer; font-size: 1em; flex: 1; white-space: nowrap; }
         .rec-content { flex: 1; padding: 12px; cursor: pointer; position: relative; z-index: 10; display: flex; justify-content: space-between; align-items: center; border-radius: 8px; transition: background 0.2s; background: #fff; width: 100%; box-sizing: border-box; }
-        
-        /* ★ 只針對被選中的項目套用淡藍色與不透明效果 */
         .rec-content.read { background-color: #f0f7ff !important; border-left: 5px solid #b3d7ff; }
         .rec-content.unread { background-color: #fff; }
-
         @media (min-width: 769px) {
             .rec-item-wrap { position: relative; display: flex; flex-direction: row; align-items: stretch; }
             .rec-actions { position: static; width: 160px; z-index: 1; border-radius: 0 8px 8px 0; }
@@ -365,17 +411,24 @@ window.showRecords = async function (isReturning = false) {
         if (r.bian && r.ben.name !== r.bian.name) guaNameDisplay = `${r.ben.name} ｜ ${r.bian.name}`;
 
         let readClass = (i === window.activeRecHighlight) ? "read" : "unread";
-
-        // ★ 核心優化 2：只有在手機版時，才組裝滑動事件字串
         let swipeEvents = isMobile
             ? `ontouchstart="handleSwipeStart(event, this, ${i})" ontouchmove="handleSwipeMove(event, this)" ontouchend="handleSwipeEnd(event, this)"`
             : "";
+
+        // 決定主要顯示的標題（優先用自訂主旨，沒有就用起卦問題）
+        let displayTitle = r.subject || r.question || '無標題';
+        // 如果有自訂主旨，且跟原始問題不同，才在後面用小字提示原問題
+        let questionSub = (r.subject && r.question && r.subject !== r.question) ? `<span style="color:#888; font-size:0.82em; font-weight:normal; margin-left:8px;">(原問: ${r.question})</span>` : "";
+        // 藍色標籤固定為常駐提示，有自訂主旨時才秀出來
+        //let subjectBadge = r.subject ? `<span style="background:var(--blue-primary); color:#fff; padding:2px 6px; border-radius:4px; font-size:0.75em; margin-right:8px; vertical-align:middle; white-space:nowrap;">主旨</span>` : "";
 
         h += `
         <div class="rec-item-wrap">
             <div class="rec-content ${readClass}" onclick="window.activeRecHighlight=${i}; if(!window.isSwiping) loadRec(${i})" ${swipeEvents}>
                 <div style="flex: 1;">
-                    <div style="font-weight:bold; font-size:1.1em; margin-bottom:4px; color:#333;">${r.question || '無標題'}</div>
+                    <div style="font-weight:bold; font-size:1.1em; margin-bottom:4px; color:#333; display:flex; align-items:center; flex-wrap:wrap;">
+                        ${subjectBadge}<span>${displayTitle}</span>${questionSub}
+                    </div>
                     <div style="font-size:0.9em; color:#666;">
                         <span style="margin-right:10px;">${r.dateStr}</span>
                         <span style="color:var(--blue-primary); font-weight:bold;">${guaNameDisplay}</span>
@@ -398,44 +451,46 @@ window.showRecords = async function (isReturning = false) {
         }, 10);
     }
 
-    // ★ 新增：初始化檢查是否需要顯示「上下滑動」提示燈
     setTimeout(() => {
         let view = document.getElementById("records-view");
         let hint = document.getElementById("scroll-hint");
         if (view && hint) {
-            // 如果內容總高度大於視窗高度，代表需要滑動
             if (view.scrollHeight > view.clientHeight) {
-                hint.style.display = 'flex'; // 先將 Display 打開
-                hint.style.opacity = '1';    // 剛進畫面時強制亮起提示
-
-                // 同樣啟動 1.5 秒的熄滅倒數
+                hint.style.display = 'flex';
+                hint.style.opacity = '1';
                 if (window.lyScrollTimeout) clearTimeout(window.lyScrollTimeout);
-                window.lyScrollTimeout = setTimeout(() => {
-                    hint.style.opacity = '0';
-                }, 1500);
-
+                window.lyScrollTimeout = setTimeout(() => { hint.style.opacity = '0'; }, 1500);
             } else {
-                // 如果紀錄很少不用滑，直接隱藏
                 hint.style.display = 'none';
             }
         }
     }, 50);
 };
 
-window.deleteRecHistory = async function (e, idx) {
-    e.stopPropagation();
-    let ok = await window.showConfirm("⚠️ 確定要永久刪除這筆紀錄嗎？");
-    if (!ok) return;
+// ==========================================
+// ★ 刪除單筆紀錄與雲端同步
+// ==========================================
+window.deleteRecHistory = function (event, i) {
+    if (event) event.stopPropagation(); // 防止點擊事件冒泡觸發讀取
 
-    // 刪除前先記住捲軸位置
-    let recView = document.getElementById("records-view");
-    if (recView) window.lastRecScroll = recView.scrollTop;
+    window.showConfirm("⚠️ 確定要刪除這筆紀錄嗎？\n(此動作無法復原，並會同步至雲端)").then(async ok => {
+        if (ok) {
+            let recs = await localforage.getItem('iching_final_v60') || [];
+            recs.splice(i, 1);
+            await localforage.setItem('iching_final_v60', recs);
 
-    let recs = await localforage.getItem('iching_final_v60') || [];
-    recs.splice(idx, 1);
-    await localforage.setItem('iching_final_v60', recs);
+            // 1. 刷新畫面
+            if (typeof showRecords === 'function') showRecords();
 
-    showRecords(true); // 傳入 true，維持捲軸位置
+            // 2. 顯示刪除提示
+            if (window.showToast) window.showToast("🗑️ 紀錄已刪除，正在同步雲端...");
+
+            // 3. ★ 核心修復：強制觸發雲端同步，立刻把雲端的舊資料也刪掉
+            if (typeof window.syncToCloud === 'function') {
+                window.syncToCloud();
+            }
+        }
+    });
 };
 
 // 介面上的更新按鈕綁定，更新紀錄後自動上鎖回唯讀狀態
@@ -444,17 +499,19 @@ window.updateCurrentRec = async function () {
     await saveRec();
 
     // 2. 存檔成功後，把欄位恢復成「反灰唯讀狀態」
+    let sEl = document.getElementById("edit-subject"); // 新增主旨宣告
     let jEl = document.getElementById("edit-judge");
     let fEl = document.getElementById("edit-feedback");
     let nEl = document.getElementById("edit-note");
 
-    [jEl, fEl, nEl].forEach(el => {
+    // 將 sEl 放入陣列，確保更新完畢後主旨同步反灰、鎖定不可編輯
+    [sEl, jEl, fEl, nEl].forEach(el => {
         if (el) {
             el.readOnly = true;
             el.style.backgroundColor = "#e9ecef";
             el.style.color = "#666";
             el.style.borderColor = "#ddd";
-            el.style.boxShadow = "none"; // 移除編輯時的發光特效
+            el.style.boxShadow = "none";
         }
     });
 
@@ -648,7 +705,7 @@ window.renderHistoryLog = function () {
         }
         let timeStr = h.dateStr || "未知時間";
 
-        // ★ 新增：如果快照中有修改紀錄，就組裝成紅色的提示字串
+        // 如果快照中有修改紀錄，就組裝成紅色的提示字串
         let diffHtml = h.diffStr ? `<div style="font-size: 0.85em; color: #dc3545; margin-top: 4px;">📝 變更內容：${h.diffStr}</div>` : '';
 
         hHtml += `
@@ -657,9 +714,12 @@ window.renderHistoryLog = function () {
                 <span style="font-weight: bold; margin-right: 8px; color: #198754;">${idx + 1}.</span>
                 <span style="color: #666; margin-right: 8px;">${timeStr}</span>
                 <span style="font-weight: bold; color: var(--blue-primary);">${gName}</span>
-                ${diffHtml} <!-- ★ 插入修改紀錄 -->
+                ${diffHtml}
             </div>
-            <div style="cursor: pointer; font-size: 1.1em; padding: 4px; transition: transform 0.1s;" onclick="deleteHistoryItem(${idx})" title="刪除此紀錄" onmousedown="this.style.transform='scale(0.9)'" onmouseup="this.style.transform='scale(1)'">🗑️</div>
+            <div style="display: flex; gap: 12px;">
+                <div style="cursor: pointer; font-size: 1.1em; padding: 4px; transition: transform 0.1s;" onclick="restoreHistoryItem(${idx})" title="套用此紀錄為當前卦象" onmousedown="this.style.transform='scale(0.9)'" onmouseup="this.style.transform='scale(1)'">⬆️</div>
+                <div style="cursor: pointer; font-size: 1.1em; padding: 4px; transition: transform 0.1s;" onclick="deleteHistoryItem(${idx})" title="刪除此紀錄" onmousedown="this.style.transform='scale(0.9)'" onmouseup="this.style.transform='scale(1)'">🗑️</div>
+            </div>
         </div>`;
     });
     hHtml += `</div>`;
@@ -669,20 +729,58 @@ window.renderHistoryLog = function () {
     resultView.appendChild(box);
 };
 
-// ★ 垃圾桶專屬刪除功能
-window.deleteHistoryItem = async function (idx) {
-    // ★ 修復：把 smartConfirm 改為我們已經動態美化過的 showConfirm
-    let ok = await window.showConfirm("⚠️ 確定要刪除這筆歷史回溯紀錄嗎？\n\n刪除後無法恢復喔！");
+// ==========================================
+// ★ 歷史紀錄操作：向上還原為當前卦象
+// ==========================================
+window.restoreHistoryItem = async function (idx) {
+    let ok = await window.showConfirm("🔄 確定要將這筆紀錄還原為「當前卦象」嗎？\n\n(目前的卦象狀態將會被封存，降級退回歷史清單中)");
     if (!ok) return;
 
+    // 1. 備份當前的完整歷史陣列
+    let currentHistory = JSON.parse(JSON.stringify(AppState.curData.history));
+
+    // 2. 抓出使用者想還原的目標紀錄
+    let targetState = currentHistory[idx];
+
+    // 3. 把「當前畫面上的卦象」(扣除 history 陣列) 打包，準備降級塞進歷史清單
+    let currentStateSnapshot = JSON.parse(JSON.stringify(AppState.curData));
+    delete currentStateSnapshot.history;
+    currentStateSnapshot.diffStr = "由上方降級封存之版本";
+
+    // 4. 從歷史陣列中把目標紀錄抽掉，並把剛才的「當前畫面狀態」塞進清單尾端
+    currentHistory.splice(idx, 1);
+    currentHistory.push(currentStateSnapshot);
+
+    // 5. 正式將目標紀錄推上王座 (覆寫 AppState.curData)
+    AppState.curData = targetState;
+
+    // 6. 把重新整理好的歷史陣列掛回去
+    AppState.curData.history = currentHistory;
+
+    // 執行存檔與重新渲染畫面
+    await saveRec();
+    if (typeof renderRes === 'function') renderRes();
+    if (window.showToast) window.showToast("✅ 卦象已成功還原！");
+};
+
+// ==========================================
+// ★ 歷史紀錄操作：純粹刪除 (修復盲點)
+// ==========================================
+window.deleteHistoryItem = async function (idx) {
+    let ok = await window.showConfirm("⚠️ 確定要刪除這筆歷史紀錄嗎？\n\n(刪除後僅會移除此條紀錄，不會影響您目前的卦象)");
+    if (!ok) return;
+
+    // 僅刪除該筆歷史
     AppState.curData.history.splice(idx, 1);
 
+    // 若歷史清空，拔除陣列
     if (AppState.curData.history.length === 0) {
         delete AppState.curData.history;
     }
 
+    // 直接觸發存檔與重繪
     await saveRec();
-    window.renderHistoryLog();
+    if (typeof renderRes === 'function') renderRes();
     if (window.showToast) window.showToast("✅ 歷史紀錄已刪除");
 };
 
@@ -929,12 +1027,32 @@ window.editRecSetup = async function (e, idx) {
             // ★ 計算修改了什麼爻
             let diffs = [];
             let yaoNames = ['初爻', '二爻', '三爻', '四爻', '五爻', '上爻'];
+
+            // 1. 比對六爻變動
             for (let i = 0; i < 6; i++) {
                 if (oldRec.lines[i] !== ls[i]) {
                     diffs.push(`${yaoNames[i]}: ${revValMap[oldRec.lines[i]]}→${revValMap[ls[i]]}`);
                 }
             }
-            let diffStr = diffs.length > 0 ? diffs.join(", ") : "僅修改時間或問題";
+
+            // 2. 精確比對問題/主旨變動
+            if (oldRec.question !== currentState.q) {
+                diffs.push(`主旨:「${oldRec.question || '無'}」→「${currentState.q}」`);
+            }
+
+            // 3. 精確比對起卦時間變動
+            if (initialState.y !== currentState.y || initialState.m !== currentState.m || initialState.d !== currentState.d || initialState.h !== currentState.h || initialState.min !== currentState.min) {
+                let oldTime = `${initialState.y}/${parseInt(initialState.m) + 1}/${initialState.d} ${initialState.h}:${initialState.min}`;
+                let newTime = `${currentState.y}/${parseInt(currentState.m) + 1}/${currentState.d} ${currentState.h}:${currentState.min}`;
+                diffs.push(`時間:「${oldTime}」→「${newTime}」`);
+            }
+
+            // 4. 精確比對南半球設定變動
+            if (oldRec.isSouthAdjust !== currentState.isSouth) {
+                diffs.push(`南半球節氣:「${oldRec.isSouthAdjust ? '啟用' : '關閉'}」→「${currentState.isSouth ? '啟用' : '關閉'}」`);
+            }
+
+            let diffStr = diffs.length > 0 ? diffs.join(", ") : "未偵測到不一致變更";
 
             // 製作備份並寫入修改紀錄
             let snapshot = JSON.parse(JSON.stringify(oldRec));
@@ -971,7 +1089,7 @@ window.editRecSetup = async function (e, idx) {
                     note: oldRec.note || "",
                     history: history // 這裡放入剛剛 push 過 snapshot 的新 history
                 };
-                process(ls, oldRec.method, preserveNotes); 
+                process(ls, oldRec.method, preserveNotes);
             }
 
             window.tempEditSouthAdjust = undefined;
