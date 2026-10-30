@@ -3,13 +3,21 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>六爻排盤</title>
     <link rel="manifest" href="ly_manifest.json">
     <link rel="stylesheet" href="ly_style.css">
 </head>
+<script src="./tools/lunar.js"></script>
 
 <body>
+    <script>
+        let earlyDark = localStorage.getItem("ly_early_dark_mode");
+        if (earlyDark === null || earlyDark === "true") {
+            document.documentElement.classList.add("global-dark-mode"); // ★ 改這裡
+            localStorage.setItem("ly_early_dark_mode", "true");
+        }
+    </script>
     <div id="ly-splash-screen">
         <div id="splash-title" style="transform: translateY(-20px);">六爻排盤</div>
         <div id="taichi-container">
@@ -86,6 +94,10 @@
     <div id="edit-backdrop"></div>
 
     <div id="portal-view" class="portal-container portal-pad">
+        <button onclick="toggleRecordsDrawer(true, 'home')" title="展開工具選單"
+            style="position: fixed; top: 30px; right: 0; background: rgba(255, 255, 255, 0.85); color: #555; border: 1px solid #ddd; border-right: none; border-radius: 8px 0 0 8px; width: 32px; height: 24px; font-size: 1rem; cursor: pointer; box-shadow: -2px 2px 6px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; z-index: 999; backdrop-filter: blur(4px); padding: 0; margin: 0;">
+            ☰
+        </button>
         <div class="card home-card">
             <div id="portal-header-title" class="portal-header home-title">六爻排盤</div>
 
@@ -96,12 +108,24 @@
                     <label><input type="radio" name="gender" value="男" checked>男</label>
                     <label class="gender-label-female"><input type="radio" name="gender" value="女">女</label>
                 </div>
-                <div id="auto-sync-container-home" style="display: none; align-items: center; font-size: 0.9rem;">
-                    <span style="margin-right: 6px; color: #555; font-weight: bold;">雲端同步</span>
-                    <label class="switch" style="transform: scale(0.75); margin: 0;">
-                        <input type="checkbox" id="set-auto-sync-home" checked>
-                        <span class="slider round"></span>
-                    </label>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <!-- 1. 連續起爻 (在左邊) -->
+                    <div id="auto-next-container" style="display: flex; align-items: center; font-size: 0.9rem;">
+                        <label class="switch" style="transform: scale(0.75); margin: 0;">
+                            <input type="checkbox" id="auto-next-yao" checked>
+                            <span class="slider round"></span>
+                        </label>
+                        <span style="font-weight: bold; color: #555;">連續起爻</span>
+                    </div>
+
+                    <!-- 2. 雲端同步 (在右邊) -->
+                    <div id="auto-sync-container-home" style="display: none; align-items: center; font-size: 0.9rem;">
+                        <label class="switch" style="transform: scale(0.75); margin: 0;">
+                            <input type="checkbox" id="set-auto-sync-home" checked>
+                            <span class="slider round"></span>
+                        </label>
+                        <span style="font-weight: bold; color: #555;">雲端同步</span>
+                    </div>
                 </div>
             </div>
 
@@ -112,7 +136,6 @@
                     <input type="checkbox" id="cb-south-adjust"> 🌏 啟用南半球節氣對沖 (月建對沖)
                 </label>
             </div>
-
             <div class="top-action-group">
                 <button class="action-btn top-action-btn btn-action-locate" onclick="autoLocateCity()">📍 帶入時位</button>
                 <button class="action-btn top-action-btn btn-action-time" onclick="openTimeModal()">🕒 自訂時位</button>
@@ -156,8 +179,8 @@
                         <div class="label-box adv-setting-label">變爻顯示</div>
                         <div class="input-content">
                             <select id="set-bian-view" class="full-width adv-setting-select">
-                                <option value="all">全顯變爻</option>
                                 <option value="move" selected>僅顯示動爻之變爻</option>
+                                <option value="all">全顯變爻</option>
                             </select>
                         </div>
                     </div>
@@ -311,7 +334,7 @@
         </div>
     </div>
 
-    <div id="result-view">
+    <div id="result-view" style="position: relative;">
         <svg id="rel-svg" class="rel-svg-canvas">
             <defs>
                 <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
@@ -369,14 +392,163 @@
                     <option value="all">全顯變爻</option>
                 </select>
             </div>
-            <div style="display: flex; gap: 5px;">
+            <div style="display: flex; gap: 5px; align-items: center;">
                 <button onclick="saveRec()" class="nav-btn-save">儲存</button>
             </div>
         </div>
 
-        <div class="classic-header"></div>
-        <div id="res-gong-title"></div>
+        <button onclick="toggleRecordsDrawer(true, 'result')" title="展開工具選單"
+            style="position: fixed; top: 60px; right: 0; background: rgba(255, 255, 255, 0.85); color: #555; border: 1px solid #ddd; border-right: none; border-radius: 8px 0 0 8px; width: 24px; height: 36px; font-size: 1rem; cursor: pointer; box-shadow: -2px 2px 6px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; z-index: 999; backdrop-filter: blur(4px); padding: 0; margin: 0;">
+            ☰
+        </button>
 
+        <button onclick="toggleYingqiDrawer(true)" title="尋找應期"
+            style="position: fixed; top: 105px; right: 0; background: rgba(255, 255, 255, 0.85); color: #17a2b8; border: 1px solid #ddd; border-right: none; border-radius: 8px 0 0 8px; width: 24px; height: 36px; font-size: 1rem; cursor: pointer; box-shadow: -2px 2px 6px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; z-index: 999; backdrop-filter: blur(4px); padding: 0; margin: 0;">
+            🎯
+        </button>
+
+        <div id="yingqi-drawer-overlay" onclick="toggleYingqiDrawer(false)"
+            style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.3); z-index: 1000; opacity: 0; transition: opacity 0.3s;">
+        </div>
+
+        <div id="yingqi-drawer-panel"
+            style="position: fixed; top: 105px; right: -250px; width: 230px; background: #ffffff; z-index: 1001; box-shadow: -2px 4px 12px rgba(0,0,0,0.15); transition: right 0.25s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; padding: 12px 10px; border-radius: 12px 0 0 12px;">
+
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #ffffff;">
+                <span style="font-size: 0.95rem; font-weight: bold; color: #17a2b8;">🎯 尋找應期</span>
+                <button onclick="toggleYingqiDrawer(false)"
+                    style="background: transparent; border: none; font-size: 1.2rem; cursor: pointer; color: #888; padding: 0; margin-top: -2px;">✖</button>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div
+                    style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #e9ecef;">
+
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-size: 0.9em; color: #666; font-weight: bold;">西元日期時間</div>
+                        <div style="display: flex; gap: 5px;">
+                            <button onclick="setYingqiToCastDate()"
+                                style="padding: 2px 10px; border: 1px solid #0d6efd; background: #e7f1ff; color: #0d6efd; border-radius: 4px; font-size: 0.85em; font-weight: bold; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">起</button>
+                            <button onclick="setYingqiToToday()"
+                                style="padding: 2px 10px; border: 1px solid #198754; background: #e8f5e9; color: #198754; border-radius: 4px; font-size: 0.85em; font-weight: bold; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">今</button>
+                            <button onclick="bringYingqiToCoreHUD()"
+                                style="padding: 2px 10px; border: 1px solid #198754; background: #e8f5e9; color: #f0da2c; border-radius: 4px; font-size: 0.85em; font-weight: bold; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">帶</button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="date" id="yq-date-input" onchange="syncYingqi('datetime'); updateYingqiDOW();"
+                            style="padding: 6px; border-radius: 4px; border: 1px solid #ced4da; width: 145px; font-family: sans-serif; font-size: 1.05rem;">
+                        <span id="yq-dow-span"
+                            style="font-size: 1.05rem; font-weight: bold; color: #0d6efd; min-width: 40px; text-align: center;"></span>
+                    </div>
+
+                    <div style="display: flex; align-items: center;">
+                        <input type="time" id="yq-time-input" onchange="syncYingqi('datetime')"
+                            style="padding: 6px; border-radius: 4px; border: 1px solid #ced4da; width: 120px; font-family: sans-serif; font-size: 1.05rem;">
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px; width: 100%;">
+
+                        <div
+                            style="display: flex; flex: 1; align-items: center; border: 1px solid #ced4da; border-radius: 4px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <button onclick="adjustYingqiDate('month', -1)"
+                                style="flex: 1; padding: 6px 0; border: none; background: #fff; border-right: 1px solid #ced4da; cursor: pointer; color: #495057;">◀</button>
+                            <span
+                                style="padding: 0 10px; font-size: 0.95em; color: #495057; background: #f1f3f5; font-weight: bold; display: flex; align-items: center; justify-content: center;">月</span>
+                            <button onclick="adjustYingqiDate('month', 1)"
+                                style="flex: 1; padding: 6px 0; border: none; background: #fff; border-left: 1px solid #ced4da; cursor: pointer; color: #495057;">▶</button>
+                        </div>
+
+                        <div
+                            style="display: flex; flex: 1; align-items: center; border: 1px solid #ced4da; border-radius: 4px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <button onclick="adjustYingqiDate('day', -1)"
+                                style="flex: 1; padding: 6px 0; border: none; background: #fff; border-right: 1px solid #ced4da; cursor: pointer; color: #495057;">◀</button>
+                            <span
+                                style="padding: 0 10px; font-size: 0.95em; color: #495057; background: #f1f3f5; font-weight: bold; display: flex; align-items: center; justify-content: center;">日</span>
+                            <button onclick="adjustYingqiDate('day', 1)"
+                                style="flex: 1; padding: 6px 0; border: none; background: #fff; border-left: 1px solid #ced4da; cursor: pointer; color: #495057;">▶</button>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 4px; align-items: center; margin-top: 1px;">
+                    <span style="font-size: 0.8rem; color: #777; width: 28px;">年月</span>
+                    <select id="yq-y-sel" class="yq-sel" onchange="syncYingqi('ganzhi')"
+                        style="border: 1px solid #ccc; border-radius: 4px; flex: 1; min-width: 0;"></select>
+                    <select id="yq-m-sel" class="yq-sel" onchange="syncYingqi('ganzhi')"
+                        style="border: 1px solid #ccc; border-radius: 4px; flex: 1; min-width: 0;"></select>
+                </div>
+                <div style="display: flex; gap: 4px; align-items: center; margin-top: 4px;">
+                    <span style="font-size: 0.8rem; color: #777; width: 28px;">日時</span>
+                    <select id="yq-d-sel" class="yq-sel" onchange="syncYingqi('ganzhi')"
+                        style="border: 1px solid #ccc; border-radius: 4px; flex: 1; min-width: 0;"></select>
+                    <select id="yq-h-sel" class="yq-sel" onchange="syncYingqi('ganzhi')"
+                        style="border: 1px solid #ccc; border-radius: 4px; flex: 1; min-width: 0;"></select>
+                </div>
+            </div>
+        </div>
+
+        <div class="classic-header"></div>
+        <!-- ★ 核心應期區塊 (上下高度緊湊壓縮版) -->
+        <div id="core-yingqi-hud"
+            style="display: none; width: 100%; flex-direction: column; margin: 0px 0 2px 0; gap: 3px;">
+            <!-- 1. 收合狀態：預設改為顯示 (display: block) -->
+            <button id="btn-show-core-yingqi" onclick="toggleCoreYingqiHud(true)"
+                style="display: block; width: 100%; background: #fffdf6; border: 2px dashed #e6a23c; border-radius: 8px; padding: 4px 10px; font-size: 0.95rem; font-weight: bold; color: #e6a23c; cursor: pointer; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); letter-spacing: 2px;">
+                ＋ 應期區塊
+            </button>
+            <!-- 2. 展開狀態：預設改為隱藏 (display: none) -->
+            <div id="core-yingqi-hud-inner"
+                style="display: none; background: #fffdf6; border: 2px solid #e6a23c; border-radius: 8px; padding: 3px 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.08); align-items: center; justify-content: space-between; gap: 4px; box-sizing: border-box; width: 100%;">
+
+                <button onclick="toggleCoreYingqiHud(false)"
+                    style="background: #e6a23c; border: none; padding: 3px 8px; border-radius: 4px; font-size: 0.95rem; font-weight: bold; cursor: pointer; color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">－</button>
+
+                <button onclick="adjustCoreHour(-1)"
+                    style="background: #ffffff; border: 1px solid #ced4da; padding: 3px 8px; border-radius: 4px; font-size: 0.95rem; font-weight: bold; cursor: pointer; color: #495057; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">◀</button>
+
+                <div
+                    style="display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; min-width: 0;">
+                    <div style="display: flex; gap: 3px; width: 100%; justify-content: center; align-items: center;">
+                        <select id="hud-h-sel" onchange="syncCoreHUDToGanzhi()"
+                            style="font-size: 1.1rem !important; font-weight: bold; color: #7f1d1d; border: 1px solid #d1d5db; border-radius: 4px; padding: 1px; background: #fff; text-align: center; flex: 1; min-width: 0;"></select>
+                        <select id="hud-d-sel" onchange="syncCoreHUDToGanzhi()"
+                            style="font-size: 1.1rem !important; font-weight: bold; color: #1e3a8a; border: 1px solid #d1d5db; border-radius: 4px; padding: 1px; background: #fff; text-align: center; flex: 1; min-width: 0;"></select>
+                        <select id="hud-m-sel" onchange="syncCoreHUDToGanzhi()"
+                            style="font-size: 1.1rem !important; font-weight: bold; color: #14532d; border: 1px solid #d1d5db; border-radius: 4px; padding: 1px; background: #fff; text-align: center; flex: 1; min-width: 0;"></select>
+                        <select id="hud-y-sel" onchange="syncCoreHUDToGanzhi()"
+                            style="font-size: 1.1rem !important; font-weight: bold; color: #4c1d95; border: 1px solid #d1d5db; border-radius: 4px; padding: 1px; background: #fff; text-align: center; flex: 1; min-width: 0;"></select>
+                    </div>
+
+                    <button id="hud-date-btn" onclick="toggleCalendarSheet(true)"
+                        style="background: transparent; border: none; color: #0d6efd; font-size: 0.95rem; font-weight: bold; cursor: pointer; text-decoration: underline; padding: 1px 0; margin: 0; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; width: 100%; text-align: center;">
+                        載入中...
+                    </button>
+                </div>
+
+                <button onclick="adjustCoreHour(1)"
+                    style="background: #ffffff; border: 1px solid #ced4da; padding: 3px 8px; border-radius: 4px; font-size: 0.95rem; font-weight: bold; cursor: pointer; color: #495057; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">▶</button>
+            </div>
+        </div>
+        <script>
+            window.toggleCoreYingqiHud = function (show) {
+                let innerHud = document.getElementById('core-yingqi-hud-inner');
+                let btnShow = document.getElementById('btn-show-core-yingqi');
+                if (!innerHud || !btnShow) return;
+
+                if (show) {
+                    innerHud.style.display = 'flex';
+                    btnShow.style.display = 'none';
+                } else {
+                    innerHud.style.display = 'none';
+                    btnShow.style.display = 'block';
+                }
+            };
+        </script>
+        <div id="res-gong-title"></div>
         <table class="gua-table">
             <thead></thead>
             <tbody id="gua-tbody"></tbody>
@@ -391,28 +563,45 @@
             <summary class="notes-summary" onclick="event.stopPropagation()">
                 <span class="notes-summary-title">📝 占斷與筆記</span>
                 <div class="notes-action-btns">
-                    <button id="btn-edit-notes" class="action-btn btn-notes-action" onclick="enableNotesEdit(event)">✏️
-                        編輯</button>
-                    <button id="btn-update-rec" class="action-btn btn-notes-action" onclick="updateCurrentRec()">💾
-                        更新紀錄</button>
+                    <button id="btn-edit-notes" class="action-btn btn-notes-action" onclick="enableNotesEdit(event)">✏️ 編輯</button>
+                    <button id="btn-update-rec" class="action-btn btn-notes-action" onclick="updateCurrentRec()">💾 更新紀錄</button>
                 </div>
             </summary>
+            
             <div class="edit-area">
+                <div class="edit-box">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <label class="edit-label" style="margin-bottom: 0;">注意：</label>
+                        <label style="font-size: 0.85rem; color: #555; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                            <input type="checkbox" id="cb-default-addon" checked onchange="toggleDefaultAddon(this.checked)">
+                            帶入預設
+                        </label>
+                    </div>
+                    <textarea id="edit-copy-addon" class="edit-input" placeholder="複製排盤時的附加指令..." style="min-height: 60px;">請參照來源資料《六爻解卦標準流程》的步驟與規範詳細解卦，並以問卦日期前輟生成解卦結果檔案。</textarea>
+                </div>
+
+                <div class="edit-box">
+                    <label class="edit-label">現況說明：</label>
+                    <textarea id="edit-current-status" class="edit-input" placeholder="請輸入現況說明..." style="min-height: 60px;"></textarea>
+                </div>
+
                 <div class="edit-box">
                     <label class="edit-label">主旨：</label>
                     <textarea id="edit-subject" class="edit-input edit-input-subject" placeholder="請輸入紀錄主旨..." rows="1"
                         style="font-weight: bold; color: #0d6efd; resize: none; overflow: hidden; padding-top: 8px; padding-bottom: 8px; line-height: 1.5;"
                         oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'"></textarea>
                 </div>
+
                 <div class="edit-box">
                     <label class="edit-label">占斷結果：</label>
                     <textarea id="edit-judge" class="edit-input edit-input-judge" placeholder="請輸入您的解卦判斷..."></textarea>
                 </div>
+
                 <div class="edit-box">
                     <label class="edit-label">事後回饋：</label>
-                    <textarea id="edit-feedback" class="edit-input edit-input-feedback"
-                        placeholder="請輸入實際發生的結果..."></textarea>
+                    <textarea id="edit-feedback" class="edit-input edit-input-feedback" placeholder="請輸入實際發生的結果..."></textarea>
                 </div>
+
                 <div class="edit-box edit-box-last">
                     <label class="edit-label">備註：</label>
                     <textarea id="edit-note" class="edit-input edit-input-note" placeholder="其他筆記..."></textarea>
@@ -425,14 +614,83 @@
         <div class="nav-bar">
             <button onclick="goBackPortal()" class="records-nav-btn">← 返回</button>
             <div class="records-nav-title">歷史紀錄</div>
-            <div class="records-nav-spacer"></div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; min-width: 60px;">
+                <button onclick="toggleSearchBar()" title="搜尋紀錄"
+                    style="background: transparent; color: #555; border: none; font-size: 1.4rem; cursor: pointer; padding: 0 5px; margin-top:-2px;">
+                    🔍
+                </button>
+                <button onclick="window.location.hash='#trash'" title="回收桶"
+                    style="background: transparent; color: #555; border: none; font-size: 1.4rem; cursor: pointer; padding: 0 5px; margin-top:-2px;">
+                    🗑️
+                </button>
+                <button onclick="toggleRecordsDrawer(true, 'records')" title="展開選單"
+                    style="background: transparent; color: #333; border: none; font-size: 1.6rem; cursor: pointer; padding: 0 5px;">
+                    ☰
+                </button>
+            </div>
         </div>
+
+        <div id="record-search-bar"
+            style="display: none; padding: 10px; background: #f8f9fa; border-bottom: 1px solid #ddd; position: sticky; top: 0; z-index: 10;">
+            <input type="text" id="record-search-input" placeholder="搜尋主旨、卦名或日期..."
+                style="width: 100%; padding: 8px 12px; border: 1px solid #ced4da; border-radius: 6px; font-size: 1rem; box-sizing: border-box; box-shadow: inset 0 1px 2px rgba(0,0,0,0.075);"
+                oninput="window.filterRecords()">
+        </div>
+
         <div id="rec-list-container"></div>
 
         <div id="scroll-hint" class="scroll-hint-box">
             <div class="scroll-hint-arrows"><span>▲</span><span>▼</span></div>
             上下滑動
         </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ★ 側拉抽屜選單 (Context-Aware 智慧切換版) -->
+    <!-- ========================================== -->
+    <div id="records-drawer-overlay" onclick="toggleRecordsDrawer(false)"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.3); z-index: 1000; opacity: 0; transition: opacity 0.3s;">
+    </div>
+
+    <div id="records-drawer-panel"
+        style="position: fixed; top: 55px; right: -160px; width: 140px; background: #ffffff; z-index: 1001; box-shadow: -2px 4px 12px rgba(0,0,0,0.15); transition: right 0.25s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; padding: 12px 10px; border-radius: 0 0 0 12px;">
+
+        <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #ffffff;">
+            <span style="font-size: 0.95rem; font-weight: bold; color: #333;">功能</span>
+            <button onclick="toggleRecordsDrawer(false)"
+                style="background: transparent; border: none; font-size: 1.2rem; cursor: pointer; color: #888; padding: 0; margin-top: -2px;">✖</button>
+        </div>
+        <div class="drawer-item"
+            style="padding: 12px; border-bottom: 1px solid #ddd; display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 0.95rem;">深色模式</span>
+            <label class="ly-switch">
+                <input type="checkbox" id="set-global-dark-mode" onclick="toggleGlobalDarkMode(this.checked)" checked>
+                <span class="ly-slider"></span>
+            </label>
+        </div>
+
+        <button id="drawer-btn-calendar"
+            onclick="history.back(); setTimeout(() => { toggleCalendarSheet(true); }, 150);"
+            style="background: #e83e8c; color: white; border: none; padding: 8px; border-radius: 6px; font-size: 0.9rem; font-weight: bold; cursor: pointer; margin-bottom: 10px; display: flex; align-items: center; justify-content: flex-start; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
+            📅 萬年曆
+        </button>
+
+        <button id="drawer-btn-copy" onclick="history.back(); setTimeout(() => { window.copyResultAsText(); }, 150);"
+            style="background: #6c757d; color: white; border: none; padding: 8px; border-radius: 6px; font-size: 0.9rem; font-weight: bold; cursor: pointer; margin-bottom: 10px; display: flex; align-items: center; justify-content: flex-start; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
+            📋 複製排盤
+        </button>
+
+        <button id="drawer-btn-upload" onclick="history.back(); setTimeout(() => { handleCloudBackup(); }, 150);"
+            style="background: #17a2b8; color: white; border: none; padding: 8px; border-radius: 6px; font-size: 0.9rem; font-weight: bold; cursor: pointer; margin-bottom: 10px; display: flex; align-items: center; justify-content: flex-start; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            📤 備份上傳
+        </button>
+
+        <button id="drawer-btn-download" onclick="history.back(); setTimeout(() => { handleCloudRestore(); }, 150);"
+            style="background: #ffc107; color: #333; border: none; padding: 8px; border-radius: 6px; font-size: 0.9rem; font-weight: bold; cursor: pointer; margin-bottom: 0; display: flex; align-items: center; justify-content: flex-start; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            📥 雲端還原
+        </button>
     </div>
 
     <div id="anim-overlay" class="anim-full-overlay">
@@ -489,15 +747,97 @@
 
                     <div class="set-divider">
                         <div class="set-subtitle">擲幣視覺模式</div>
-                        <div class="set-radio-group">
+                        <div class="set-radio-group" style="flex-wrap: wrap;">
                             <label class="set-radio-label">
-                                <input type="radio" name="toss-mode" value="video" checked class="set-radio-input">
-                                傳統影片/GIF
+                                <input type="radio" name="toss-mode" value="video" class="set-radio-input">
+                                傳統自訂圖片
                             </label>
                             <label class="set-radio-label">
                                 <input type="radio" name="toss-mode" value="3d" class="set-radio-input"> 3D 模擬硬幣
                             </label>
+                            <label class="set-radio-label">
+                                <!-- ★ 加上 checked 讓它成為預設選項 -->
+                                <input type="radio" name="toss-mode" value="qianlong" checked class="set-radio-input">
+                                乾隆通寶
+                            </label>
                         </div>
+                        <!-- ★ 龜殼搖卦專屬設定 (升級版) -->
+                        <div id="settings-turtle-box"
+                            style="display: none; border: 1px solid #cce0ff; background: #eef5ff; padding: 12px; border-radius: 6px; margin-top: 10px; margin-bottom: 10px;">
+
+                            <style>
+                                /* 專屬的迷你龜殼搖動動畫 */
+                                @keyframes turtle-shake-mini {
+                                    0% {
+                                        transform: translate(0.5px, 0.5px) rotate(0deg);
+                                    }
+
+                                    20% {
+                                        transform: translate(-1px, 0px) rotate(5deg);
+                                    }
+
+                                    40% {
+                                        transform: translate(1px, -1px) rotate(5deg);
+                                    }
+
+                                    60% {
+                                        transform: translate(-1px, 1px) rotate(0deg);
+                                    }
+
+                                    80% {
+                                        transform: translate(-1px, -1px) rotate(5deg);
+                                    }
+
+                                    100% {
+                                        transform: translate(1px, -1px) rotate(-5deg);
+                                    }
+                                }
+                            </style>
+
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <div style="font-weight: bold; color: #004085; font-size: 0.95rem;">🐢 乾隆通寶專屬設定</div>
+                                <!-- ★ 迷你預覽龜殼 -->
+                                <div id="turtle-preview-container"
+                                    style="width: 24px; height: 28px; background-size: cover; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); transform-origin: center bottom;">
+                                </div>
+                            </div>
+
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                                <span
+                                    style="font-size: 0.9rem; font-weight: bold; color: #333; white-space: nowrap;">龜殼手感</span>
+                                <input type="range" id="set-turtle-speed" min="1" max="10" step="1" value="1"
+                                    style="flex: 1;" oninput="
+                                    document.getElementById('turtle-speed-disp').innerText = this.value;
+                                    let baseDur = 0.45 - (this.value - 1) * 0.03; 
+                                    document.getElementById('turtle-preview-container').style.animation = 'turtle-shake-mini ' + baseDur + 's infinite';
+                                ">
+                                <span
+                                    style="width: 20px; font-size: 0.85rem; font-weight: bold; color: #0d6efd; text-align: right;"
+                                    id="turtle-speed-disp">1</span>
+                            </div>
+
+                            <label class="set-checkbox-label"
+                                style="margin-bottom: 10px; font-size: 0.9rem; color: #333;">
+                                <!-- ★ 加上 checked -->
+                                <input type="checkbox" id="set-turtle-move-speed" class="set-checkbox-input"
+                                    style="transform: scale(1.1);" checked> 🌀 啟用「按移變速」(按壓時滑動加速)
+                            </label>
+
+                            <label class="set-checkbox-label"
+                                style="margin-bottom: 10px; font-size: 0.9rem; color: #333;">
+                                <!-- ★ 加上 checked，並註明限制 -->
+                                <input type="checkbox" id="set-turtle-vibrate" class="set-checkbox-input"
+                                    style="transform: scale(1.1);" checked> 📱 搖動時震動 (僅限 Android 支援)
+                            </label>
+
+                            <label class="set-checkbox-label" style="margin-bottom: 0; font-size: 0.9rem; color: #333;">
+                                <!-- ★ 加上 checked -->
+                                <input type="checkbox" id="set-turtle-auto-next" class="set-checkbox-input"
+                                    style="transform: scale(1.1);" checked> ⏭️ 落幣後自動顯示結果 (免點擊)
+                            </label>
+                        </div>
+                        <!-- ★ 龜殼專屬設定結束 -->
 
                         <div id="settings-3d-coin">
                             <div class="set-hint-text">上傳您專屬的銅錢正反面 (建議為正方形圖片)：</div>
@@ -522,7 +862,7 @@
                                             min="50" step="50" class="anim-img-time-input"> 毫秒</div>
                                 </div>
                                 <div class="anim-img-box">
-                                    <div class="anim-img-title">擲幣 (🌗)</div>
+                                    <div class="anim-img-title">擲幣 (☯️)</div>
                                     <input type="file" id="img-up-toss" accept="image/*,video/*" class="anim-img-input">
                                     <div class="anim-img-time">播 <input type="number" id="img-tm-toss" value="2300"
                                             min="50" step="50" class="anim-img-time-input"> 毫秒</div>
@@ -562,19 +902,35 @@
                                 onclick="restoreDefaultCoins()">🔄 還原擲筊與硬幣預設圖片</button>
                         </div>
                         <div class="shake-setting-box">
-                            <label class="shake-setting-label">
-                                <input type="checkbox" id="set-shake" class="shake-setting-input"> 啟用搖晃手機擲幣功能
-                            </label>
+                            <div class="set-row">
+                                <span class="set-label">擲幣觸發方式</span>
+                                <div class="set-radio-group">
+                                    <label class="set-radio-label">
+                                        <input type="radio" name="toss-trigger" value="click" class="set-radio-input">
+                                        點擊
+                                    </label>
+                                    <label class="set-radio-label">
+                                        <input type="radio" name="toss-trigger" value="shake" class="set-radio-input">
+                                        搖晃
+                                    </label>
+                                    <label class="set-radio-label">
+                                        <!-- ★ 預設勾選按壓 -->
+                                        <input type="radio" name="toss-trigger" value="press" checked
+                                            class="set-radio-input"> 按壓
+                                    </label>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="anim-end-box">
                             <div class="set-subtitle">擲幣結束條件</div>
                             <div class="anim-end-group">
                                 <label class="anim-end-label">
-                                    <input type="radio" name="anim-end" value="manual" class="anim-end-input"> 點擊畫面以繼續
+                                    <input type="radio" name="anim-end" value="manual" checked class="anim-end-input">
+                                    點擊畫面以繼續
                                 </label>
                                 <label class="anim-end-label">
-                                    <input type="radio" name="anim-end" value="auto" checked class="anim-end-input"> 停留
+                                    <input type="radio" name="anim-end" value="auto" class="anim-end-input"> 停留
                                     <input type="number" id="set-end-time" value="1000" min="50" step="50"
                                         class="anim-end-time-input"> 毫秒自動繼續
                                 </label>
@@ -671,6 +1027,128 @@
         </div>
     </div>
 
+    <div id="calendar-sheet-overlay" onclick="toggleCalendarSheet(false)"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 200; opacity: 0; transition: opacity 0.3s;">
+    </div>
+
+    <div id="calendar-sheet-panel"
+        style="position: fixed; bottom: -100%; left: 0; right: 0; max-height: 65vh; background: #fafafa; z-index: 201; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 25px rgba(0,0,0,0.2); transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; padding: 12px 10px;">
+
+        <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 6px; width: 100%;">
+            <div
+                style="display: flex; flex-direction: column; white-space: nowrap; flex-shrink: 0; margin-right: auto;">
+                <span style="font-size: 1rem; font-weight: bold; color: #333;" id="cal-title-gregorian">2026 年 7
+                    月</span>
+                <span style="font-size: 0.75rem; color: #777; font-weight: bold;" id="cal-title-lunar">【請選擇日期】</span>
+            </div>
+
+            <div
+                style="display: flex; gap: 4px; align-items: center; flex-shrink: 1; overflow-x: auto; padding-left: 5px;">
+                <select id="cal-radar-y" onchange="jumpCalToRadar('year')"
+                    style="padding: 2px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold; background: #fff; font-size: 0.8rem; width: 44px; text-align: center;">
+                    <option value="">年</option>
+                    <option value="子">子</option>
+                    <option value="丑">丑</option>
+                    <option value="寅">寅</option>
+                    <option value="卯">卯</option>
+                    <option value="辰">辰</option>
+                    <option value="巳">巳</option>
+                    <option value="午">午</option>
+                    <option value="未">未</option>
+                    <option value="申">申</option>
+                    <option value="酉">酉</option>
+                    <option value="戌">戌</option>
+                    <option value="亥">亥</option>
+                </select>
+                <select id="cal-radar-m" onchange="jumpCalToRadar('month')"
+                    style="padding: 2px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold; background: #fff; font-size: 0.8rem; width: 44px; text-align: center;">
+                    <option value="">月</option>
+                    <option value="子">子</option>
+                    <option value="丑">丑</option>
+                    <option value="寅">寅</option>
+                    <option value="卯">卯</option>
+                    <option value="辰">辰</option>
+                    <option value="巳">巳</option>
+                    <option value="午">午</option>
+                    <option value="未">未</option>
+                    <option value="申">申</option>
+                    <option value="酉">酉</option>
+                    <option value="戌">戌</option>
+                    <option value="亥">亥</option>
+                </select>
+                <select id="cal-radar-select" onchange="highlightRadarDays()"
+                    style="padding: 2px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold; background: #fff; font-size: 0.8rem; width: 44px; text-align: center;">
+                    <option value="">日</option>
+                    <option value="子">子</option>
+                    <option value="丑">丑</option>
+                    <option value="寅">寅</option>
+                    <option value="卯">卯</option>
+                    <option value="辰">辰</option>
+                    <option value="巳">巳</option>
+                    <option value="午">午</option>
+                    <option value="未">未</option>
+                    <option value="申">申</option>
+                    <option value="酉">酉</option>
+                    <option value="戌">戌</option>
+                    <option value="亥">亥</option>
+                </select>
+
+                <button id="cal-btn-apply" onclick="applyCalendarToYingqi()"
+                    style="background: #198754; color: white; border: none; padding: 4px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; cursor: pointer; white-space: nowrap; flex-shrink: 0;">✅
+                    帶入</button>
+                <button onclick="toggleCalendarSheet(false)"
+                    style="background: #eee; border: none; width: 26px; height: 26px; border-radius: 50%; font-size: 1rem; cursor: pointer; color: #666; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">✖</button>
+            </div>
+        </div>
+
+        <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; background: #fff; padding: 4px 8px; border-radius: 6px; border: 1px solid #eee;">
+            <button onclick="changeCalMonth(-12)"
+                style="background:transparent; border:none; font-size:1rem; cursor:pointer; color:var(--blue-primary)">≪
+                年</button>
+            <button onclick="changeCalMonth(-1)"
+                style="background:transparent; border:none; font-size:1rem; cursor:pointer; color:var(--blue-primary)">＜
+                月</button>
+            <button onclick="jumpToCurrentCal()"
+                style="background:#e7f1ff; border:none; padding:2px 10px; border-radius:4px; font-weight:bold; cursor:pointer; color:var(--blue-primary); font-size: 0.9rem;">今日</button>
+            <button onclick="changeCalMonth(1)"
+                style="background:transparent; border:none; font-size:1rem; cursor:pointer; color:var(--blue-primary)">月
+                ＞</button>
+            <button onclick="changeCalMonth(12)"
+                style="background:transparent; border:none; font-size:1rem; cursor:pointer; color:var(--blue-primary)">年
+                ≫</button>
+        </div>
+
+        <div
+            style="display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-weight: bold; margin-bottom: 4px; color: #555; font-size: 0.8rem;">
+            <div style="color: #dc3545;">日</div>
+            <div>一</div>
+            <div>二</div>
+            <div>三</div>
+            <div>四</div>
+            <div>五</div>
+            <div style="color: #198754;">六</div>
+        </div>
+
+        <div id="calendar-days-grid"
+            style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; overflow-y: auto; flex: 1; padding-bottom: 10px;">
+        </div>
+    </div>
+    <!-- ========================================== -->
+    <!-- ★ 回收桶專屬視窗 (暗黑沉穩風格) -->
+    <!-- ========================================== -->
+    <div id="trash-view"
+        style="display: none; flex-direction: column; background: #212529; height: 100dvh; width: 100%; position: absolute; top: 0; left: 0; z-index: 50;">
+        <div class="nav-bar" style="background: #343a40; border-bottom: 1px solid #495057;">
+            <button onclick="history.back()" class="records-nav-btn"
+                style="background: #495057; color: white; border: 1px solid #6c757d;">← 返回</button>
+            <div class="records-nav-title" style="color: #f8f9fa;">回收桶</div>
+            <div style="min-width: 60px;"></div>
+        </div>
+        <div id="trash-list-container" style="padding: 15px; overflow-y: auto; flex: 1;"></div>
+    </div>
+
     <script>window.$ = id => document.getElementById(id);</script>
     <script src="./tools/localforage.min.js"></script>
     <script type="module" src="ly_firebase-config.js"></script>
@@ -679,6 +1157,7 @@
     <script src="./ly_engine.js"></script>
     <script src="./taiwan_map.js"></script>
     <script src="./ly_ui.js"></script>
+    <script src="./ly_calendar.js"></script>
     <script src="./ly_draw.js"></script>
 
     <script>
@@ -689,6 +1168,146 @@
                     .catch(error => { console.log('Service Worker 註冊失敗：', error); });
             });
         }
+    </script>
+    <script>
+        window.toggleRecordsDrawer = function (show, mode = 'records', fromBackBtn = false) {
+            let overlay = document.getElementById('records-drawer-overlay');
+            let panel = document.getElementById('records-drawer-panel');
+
+            if (!overlay || !panel) return;
+
+            if (show) {
+                history.pushState({ panel: "records" }, "");
+
+                let btnCal = document.getElementById('drawer-btn-calendar');
+                let btnCopy = document.getElementById('drawer-btn-copy');
+                let btnUpload = document.getElementById('drawer-btn-upload');
+                let btnDownload = document.getElementById('drawer-btn-download');
+
+                // ★ 智慧切換三種情境的按鈕顯示
+                if (mode === 'records') {
+                    // 歷史紀錄頁：只顯示備份、還原
+                    if (btnCal) btnCal.style.display = 'none';
+                    if (btnCopy) btnCopy.style.display = 'none';
+                    if (btnUpload) btnUpload.style.display = 'flex';
+                    if (btnDownload) btnDownload.style.display = 'flex';
+                } else if (mode === 'result') {
+                    // 卦盤解析頁：只顯示萬年曆、複製排盤
+                    if (btnCal) btnCal.style.display = 'flex';
+                    if (btnCopy) btnCopy.style.display = 'flex';
+                    if (btnUpload) btnUpload.style.display = 'none';
+                    if (btnDownload) btnDownload.style.display = 'none';
+                } else if (mode === 'home') {
+                    // ★ 首頁模式：顯示萬年曆、備份、還原 (不需要複製排盤)
+                    if (btnCal) btnCal.style.display = 'flex';
+                    if (btnCopy) btnCopy.style.display = 'none';
+                    if (btnUpload) btnUpload.style.display = 'flex';
+                    if (btnDownload) btnDownload.style.display = 'flex';
+                }
+
+                overlay.style.display = 'block';
+                void overlay.offsetWidth;
+                overlay.style.opacity = '1';
+                panel.style.right = '0';
+            } else {
+                overlay.style.opacity = '0';
+                panel.style.right = '-160px';
+                setTimeout(() => { overlay.style.display = 'none'; }, 250);
+
+                if (!fromBackBtn && history.state && history.state.panel === "records") {
+                    history.back();
+                }
+            }
+        };
+        // ==========================================
+        // ★ 雲端備份與還原的 UI 封裝 (加入太極圖動畫過場)
+        // ==========================================
+        window.handleCloudBackup = async function () {
+            let isUnlocked = await localforage.getItem('ly_cloud_unlocked');
+            if (!isUnlocked) {
+                window.showAlert("⚠️ 系統保護機制：<br><br>偵測到您尚未進行首次雲端還原！<br>為避免本機新卦意外覆蓋掉雲端的舊紀錄，請先點選「📥 雲端還原」拉取舊資料，系統將為您自動比對合併！");
+                return;
+            }
+
+            let container = document.getElementById("rec-list-container");
+            if (container) {
+                container.innerHTML = `
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:60vh; background:rgba(0,0,0,0.5); border-radius:8px; animation: fadeIn 0.3s ease-in-out;">
+                        <div class="taichi-spinner" style="font-size: 3.5rem; color: #fff; animation: taichi-spin 1.2s linear infinite; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">☯</div>
+                        <div class="records-loader-text" style="margin-top: 15px; font-size: 1.1rem; font-weight: bold; color: #fff; letter-spacing: 2px; text-shadow: 0 1px 3px rgba(0,0,0,0.6);">上傳至雲端道域中...</div>
+                    </div>
+                `;
+            }
+
+            if (typeof window.syncToCloud === 'function') {
+                await window.syncToCloud(true);
+            }
+            if (typeof window.showRecords === 'function') {
+                window.showRecords();
+            }
+        };
+
+        window.handleCloudRestore = async function () {
+            let container = document.getElementById("rec-list-container");
+            if (container) {
+                container.innerHTML = `
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:60vh; background:rgba(0,0,0,0.5); border-radius:8px; animation: fadeIn 0.3s ease-in-out;">
+                        <div class="taichi-spinner" style="font-size: 3.5rem; color: #fff; animation: taichi-spin 1.2s linear infinite; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">☯</div>
+                        <div class="records-loader-text" style="margin-top: 15px; font-size: 1.1rem; font-weight: bold; color: #fff; letter-spacing: 2px; text-shadow: 0 1px 3px rgba(0,0,0,0.6);">從雲端接引資料中...</div>
+                    </div>
+                `;
+            }
+
+            if (typeof window.restoreSystemFromCloud === 'function') {
+                await window.restoreSystemFromCloud();
+            }
+            if (typeof window.showRecords === 'function') {
+                window.showRecords();
+            }
+        };
+
+        // ==========================================
+        // ★ 歷史紀錄搜尋與收闔控制器
+        // ==========================================
+        window.toggleSearchBar = function () {
+            let bar = document.getElementById("record-search-bar");
+            let input = document.getElementById("record-search-input");
+
+            if (bar.style.display === "none") {
+                bar.style.display = "block";
+                input.focus();
+            } else {
+                bar.style.display = "none";
+                input.value = "";
+                window.filterRecords();
+            }
+        };
+
+        window.filterRecords = function () {
+            let inputEl = document.getElementById("record-search-input");
+            if (!inputEl) return;
+
+            let keyword = inputEl.value.toLowerCase().trim();
+
+            // ★ 修正：紀錄列表現在是被包在 ly-real-data-pool 裡面
+            let pool = document.getElementById("ly-real-data-pool");
+            if (!pool) return;
+
+            let items = pool.children;
+
+            for (let i = 0; i < items.length; i++) {
+                let item = items[i];
+                if (item.nodeType !== 1) continue;
+
+                let text = item.textContent.toLowerCase();
+
+                if (keyword === "" || text.includes(keyword)) {
+                    item.style.display = "";
+                } else {
+                    item.style.display = "none";
+                }
+            }
+        };
     </script>
 </body>
 

@@ -10,7 +10,27 @@ window.cancelTimeModal = function () {
     history.back(); // 觸發返回，Router 會自動關閉它
 };
 window.closeTimeModal = function () {
-    if (window.showToast) window.showToast("✅ 時間與地區已儲存並返回！");
+    let y = document.getElementById("ts-year").value;
+    let m = parseInt(document.getElementById("ts-month").value) + 1;
+    let d = document.getElementById("ts-day").value;
+    let h = document.getElementById("ts-hour").value;
+    let min = document.getElementById("ts-minute").value;
+    let timeStr = `${y}/${m}/${d} ${h}:${min.padStart(2, '0')}`;
+
+    let citySel = document.getElementById("city-select");
+    let locStr = "自訂位置";
+    if (citySel && citySel.selectedIndex > -1) {
+        locStr = citySel.options[citySel.selectedIndex].text.replace("📍 ", "");
+    }
+
+    if (typeof window.syncStatusMsg === 'function') {
+        window.syncStatusMsg(`<span style="color:#dc3545; font-weight:bold;">🕒 ${timeStr}</span>`, `<span style="color:#dc3545; font-weight:bold;">📍 ${locStr}</span>`);
+    }
+
+    // ★ 新增標記：使用者已經自訂過時間了，接下來起卦請勿自動覆蓋成現在時間
+    window.isCustomTimeSet = true;
+
+    if (window.showToast) window.showToast("✅ 自訂時位已儲存！");
     history.back();
 };
 
@@ -176,7 +196,8 @@ async function playPhase(imgKey, defaultHtml, displaySeconds) {
 async function handleRitualEnd(result, nextHint, overlay, msgEl) {
     let endMsg = (AppState.currentCastStep < 5) ? "起爻完成" : "六爻已成，即將排盤";
     if (animCfg.endMode === 'click') {
-        nextHint.innerHTML = `${endMsg}<br><span style='font-size:0.8em; opacity:0.8;'>請點擊畫面以繼續</span>`;
+        // ★ 加上 div 包覆置中
+        nextHint.innerHTML = `<div style="text-align:center;">${endMsg}<br><span style='font-size:0.8em; opacity:0.8;'>請點擊畫面以繼續</span></div>`;
         nextHint.style.display = "block";
         await new Promise(r => {
             const endFn = () => { overlay.removeEventListener('click', endFn); r(); };
@@ -190,35 +211,129 @@ async function handleRitualEnd(result, nextHint, overlay, msgEl) {
             let timer = setInterval(() => {
                 let elapsed = Date.now() - startTime;
                 let left = Math.max(0, duration - elapsed) / 1000;
-                nextHint.innerHTML = `${endMsg}<br><span style='font-size:0.8em; opacity:0.8;'>請等待 ${left.toFixed(2)} 秒以繼續</span>`;
+                // ★ 加上 div 包覆置中
+                nextHint.innerHTML = `<div style="text-align:center;">${endMsg}<br><span style='font-size:0.8em; opacity:0.8;'>請等待 ${left.toFixed(2)} 秒以繼續</span></div>`;
                 if (left <= 0) { clearInterval(timer); r(); }
             }, 20);
-            nextHint.innerHTML = `${endMsg}<br><span style='font-size:0.8em; opacity:0.8;'>請等待 ${animCfg.endTime.toFixed(2)} 秒以繼續</span>`;
+            // ★ 加上 div 包覆置中
+            nextHint.innerHTML = `<div style="text-align:center;">${endMsg}<br><span style='font-size:0.8em; opacity:0.8;'>請等待 ${animCfg.endTime.toFixed(2)} 秒以繼續</span></div>`;
         });
     }
     return result;
 }
 
 // ==========================================
-// ★ 單一爻的完整動畫儀式 (極簡優化版)
+// ★ 單一爻的完整動畫儀式 (陣列脈衝震動 + 掉落震動版)
 // ==========================================
 async function castRitualFlow(isFirst, yaoName) {
     await loadSettings();
-    let overlay = $("anim-overlay");
-    let nextHint = $("next-yao-hint");
-    let msgEl = $("anim-msg");
-    let shakeHint = $("shake-hint");
+    let overlay = document.getElementById("anim-overlay");
+    let nextHint = document.getElementById("next-yao-hint");
+    let msgEl = document.getElementById("anim-msg");
+    let shakeHint = document.getElementById("shake-hint");
+
+    // ★ 終極鎖定 1：讓下方提示文字絕對定位，脫離排版流，絕對不推擠上方龜殼！
+    shakeHint.style.position = "absolute";
+    shakeHint.style.bottom = "12%";
+    shakeHint.style.left = "0";
+    shakeHint.style.width = "100%";
+    shakeHint.style.textAlign = "center";
+    shakeHint.style.margin = "0";
+
+    nextHint.style.position = "absolute";
+    nextHint.style.bottom = "12%";
+    nextHint.style.left = "0";
+    nextHint.style.width = "100%";
+    nextHint.style.textAlign = "center";
+    nextHint.style.margin = "0";
 
     overlay.style.display = "flex";
     nextHint.style.display = "none";
     shakeHint.style.display = "none";
 
-    // 1. 增加「誠心思考」點擊啟動邏輯
+    overlay.style.userSelect = "none";
+    overlay.style.webkitUserSelect = "none";
+    overlay.style.webkitTouchCallout = "none";
+    overlay.oncontextmenu = (e) => { e.preventDefault(); return false; };
+
+    const rawChar = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="47" fill="#b67c33" stroke="#3e210b" stroke-width="6"/><rect x="35" y="35" width="30" height="30" fill="none" stroke="#3e210b" stroke-width="5"/><text x="50" y="30" font-family="sans-serif" font-size="24" font-weight="900" fill="#1f0f04" text-anchor="middle">乾</text><text x="50" y="86" font-family="sans-serif" font-size="24" font-weight="900" fill="#1f0f04" text-anchor="middle">隆</text><text x="84" y="58" font-family="sans-serif" font-size="24" font-weight="900" fill="#1f0f04" text-anchor="middle">通</text><text x="16" y="58" font-family="sans-serif" font-size="24" font-weight="900" fill="#1f0f04" text-anchor="middle">寶</text></svg>`;
+    const rawManchu = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="47" fill="#b67c33" stroke="#3e210b" stroke-width="6"/><rect x="35" y="35" width="30" height="30" fill="none" stroke="#3e210b" stroke-width="5"/><path d="M 20 40 Q 15 50 25 65 M 25 35 L 25 45" fill="none" stroke="#1f0f04" stroke-width="8" stroke-linecap="round"/><path d="M 80 35 L 80 65 Q 85 55 75 45" fill="none" stroke="#1f0f04" stroke-width="8" stroke-linecap="round"/></svg>`;
+    const rawShell = `<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg"><ellipse cx="50" cy="60" rx="45" ry="55" fill="#5c4033" stroke="#2a1610" stroke-width="4"/><path d="M 50 15 L 75 35 L 75 85 L 50 105 L 25 85 L 25 35 Z" fill="#7a5441" stroke="#2a1610" stroke-width="3"/><path d="M 25 35 L 9 25 M 75 35 L 91 25 M 25 85 L 9 95 M 75 85 L 91 95 M 50 15 L 50 5 M 50 105 L 50 115 M 25 60 L 75 60" stroke="#2a1610" stroke-width="3"/></svg>`;
+
+    const yinSvg = `data:image/svg+xml;utf8,${encodeURIComponent(rawChar)}`;
+    const yangSvg = `data:image/svg+xml;utf8,${encodeURIComponent(rawManchu)}`;
+    const shellSvg = `data:image/svg+xml;utf8,${encodeURIComponent(rawShell)}`;
+
+    let uiSpeed = animCfg.turtleSpeed || 1;
+    let baseDuration = 0.45 - (uiSpeed - 1) * 0.03;
+    let shakeDuration = baseDuration;
+
+    // 1. 靜止等待狀態
+    const qianlongStaticHtml = `
+        <div style="position:relative; width:100vw; height:320px;">
+            <div style="position:absolute; top:10px; left:calc(50% - 50px); width:100px; height:120px; background-image:url('${shellSvg}'); background-size:cover; filter: drop-shadow(0 10px 8px rgba(0,0,0,0.5)); transition: transform 0.2s;"></div>
+        </div>`;
+
+    // 2. 搖晃狀態
+    const qianlongShakeHtml = `
+        <style>
+            @keyframes turtle-shake { 
+                0% { transform: translate(1px, 1px) rotate(0deg); } 
+                20% { transform: translate(-4px, 0px) rotate(5deg); } 
+                40% { transform: translate(2px, -2px) rotate(5deg); } 
+                60% { transform: translate(-4px, 2px) rotate(0deg); } 
+                80% { transform: translate(-2px, -2px) rotate(5deg); } 
+                100% { transform: translate(2px, -3px) rotate(-5deg); } 
+            }
+            /* 硬幣維持 65px，調整位移幅度讓大硬幣的推擠感更真實 */
+            @keyframes coin-rattle-1 { 
+                0% { transform: translate(0,0) rotate(0deg); } 
+                25% { transform: translate(-8px, -12px) rotate(90deg); } 
+                50% { transform: translate(10px, 6px) rotate(180deg); } 
+                75% { transform: translate(-6px, 14px) rotate(270deg); } 
+                100% { transform: translate(0,0) rotate(360deg); } 
+            }
+            @keyframes coin-rattle-2 { 
+                0% { transform: translate(0,0) rotate(0deg); } 
+                25% { transform: translate(12px, 8px) rotate(120deg); } 
+                50% { transform: translate(-10px, -8px) rotate(240deg); } 
+                75% { transform: translate(8px, -15px) rotate(300deg); } 
+                100% { transform: translate(0,0) rotate(360deg); } 
+            }
+            @keyframes coin-rattle-3 { 
+                0% { transform: translate(0,0) rotate(0deg); } 
+                25% { transform: translate(-10px, 15px) rotate(-90deg); } 
+                50% { transform: translate(8px, -12px) rotate(-180deg); } 
+                75% { transform: translate(-8px, 8px) rotate(-270deg); } 
+                100% { transform: translate(0,0) rotate(-360deg); } 
+            }
+        </style>
+        <div style="position:relative; width:100vw; height:320px;">
+            <!-- 將硬幣恢復為 65px (與落幣時完全一致)，精準藏在龜殼中心點正後方 -->
+            <div style="position:absolute; width:65px; height:65px; border-radius:50%; background-image:url('${yangSvg}'); background-size:cover; animation: coin-rattle-1 0.15s linear infinite; top:30px; left:calc(50% - 32.5px); z-index:1;"></div>
+            <div style="position:absolute; width:65px; height:65px; border-radius:50%; background-image:url('${yinSvg}'); background-size:cover; animation: coin-rattle-2 0.18s linear infinite; top:30px; left:calc(50% - 32.5px); z-index:1;"></div>
+            <div style="position:absolute; width:65px; height:65px; border-radius:50%; background-image:url('${yangSvg}'); background-size:cover; animation: coin-rattle-3 0.2s linear infinite; top:30px; left:calc(50% - 32.5px); z-index:1;"></div>
+            
+            <!-- 龜殼本體在最上層 (z-index: 3) -->
+            <div id="turtle-anim-box" style="position:absolute; top:10px; left:calc(50% - 50px); width:100px; height:120px; background-image:url('${shellSvg}'); background-size:cover; animation: turtle-shake ${shakeDuration}s infinite; filter: drop-shadow(0 15px 10px rgba(0,0,0,0.6)); z-index:3;"></div>
+        </div>`;
+
+    const tossThreeCoins = () => { /* ...原本的函式保留... */
+        let c = 0;
+        for (let j = 0; j < 3; j++) { if (Math.random() > 0.5) c++; }
+        return ["老陰", "少陽", "少陰", "老陽"][c];
+    };
+
     if (isFirst) {
         msgEl.innerText = "請誠心思考占卜事情......";
-        shakeHint.innerText = "思考完畢後，點擊畫面開始擲幣";
+        shakeHint.innerText = "思考完畢後，點擊畫面開始";
         shakeHint.style.display = "block";
-        await playPhase('img_prep', '<div class="anim-emoji">🙏</div>', 0);
+        window.lastCastCoins = null;
+
+        let taichiHtml = `<style>@keyframes breathe { 0% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.15); opacity: 1; filter: drop-shadow(0 0 15px rgba(255,255,255,0.6)); } 100% { transform: scale(1); opacity: 0.8; } }</style>
+        <div class="anim-emoji" style="animation: breathe 2.5s ease-in-out infinite;">☯️</div>`;
+
+        await playPhase('img_prep', taichiHtml, 0);
         await new Promise(resolve => {
             const startCasting = () => { overlay.removeEventListener('click', startCasting); resolve(); };
             overlay.addEventListener('click', startCasting);
@@ -226,20 +341,206 @@ async function castRitualFlow(isFirst, yaoName) {
         shakeHint.style.display = "none";
     }
 
-    // 2. 等待搖晃或點擊
     msgEl.innerText = `正在起【${yaoName}】`;
-    await playPhase('img_toss', '<div class="anim-emoji">🌗</div>', 0);
-    shakeHint.innerText = animCfg.useShake ? "📳 請搖晃手機擲幣..." : "👆 點擊畫面擲幣...";
-    shakeHint.style.display = "block";
-    await waitForShakeOrClick();
+    let result = "";
+    let classMap = { "少陽": "seal-sy", "老陽": "seal-oy", "少陰": "seal-sn", "老陰": "seal-on" };
+
+    let defaultBox = document.getElementById("anim-default");
+    document.getElementById("anim-img").style.display = "none";
+
+    // 3. 銅錢收回狀態
+    if (!isFirst && animCfg.tossMode === 'qianlong' && window.lastCastCoins) {
+        msgEl.innerText = "收起銅錢...";
+        let retractHtml = `
+        <style>
+            @keyframes retract1 { 0% { transform: translate(-45px, 80px) scale(0.9); opacity: 1; } 100% { transform: translate(0, 30px) scale(0.3); opacity: 0; } }
+            @keyframes retract2 { 0% { transform: translate(45px, 80px) scale(0.9); opacity: 1; } 100% { transform: translate(0, 30px) scale(0.3); opacity: 0; } }
+            @keyframes retract3 { 0% { transform: translate(0px, 115px) scale(0.9); opacity: 1; } 100% { transform: translate(0, 30px) scale(0.3); opacity: 0; } }
+        </style>
+        <div style="position:relative; width:100vw; height:320px;">
+            <div style="position:absolute; top:10px; left:calc(50% - 50px); width:100px; height:120px; background-image:url('${shellSvg}'); background-size:cover; filter: drop-shadow(0 15px 10px rgba(0,0,0,0.6)); z-index:4;"></div>
+            <div style="position:absolute; left:calc(50% - 32.5px); width:65px; height:65px; border-radius:50%; background-image:url('${window.lastCastCoins[0]}'); background-size:cover; animation: retract1 0.4s ease-in forwards; z-index:2; top: 30px;"></div>
+            <div style="position:absolute; left:calc(50% - 32.5px); width:65px; height:65px; border-radius:50%; background-image:url('${window.lastCastCoins[1]}'); background-size:cover; animation: retract2 0.4s ease-in forwards; z-index:2; top: 30px;"></div>
+            <div style="position:absolute; left:calc(50% - 32.5px); width:65px; height:65px; border-radius:50%; background-image:url('${window.lastCastCoins[2]}'); background-size:cover; animation: retract3 0.4s ease-in forwards; z-index:2; top: 30px;"></div>
+        </div>`;
+        defaultBox.innerHTML = retractHtml;
+        defaultBox.style.display = "block";
+        await new Promise(r => setTimeout(r, 450));
+        msgEl.innerText = `正在起【${yaoName}】`;
+    }
+
+    defaultBox.innerHTML = animCfg.tossMode === 'qianlong' ? qianlongStaticHtml : '<div class="anim-emoji">🌗</div>';
+    defaultBox.style.display = "block";
+
+    let tossTrigger = animCfg.tossTrigger || 'press';
+    let skipFixedTossDelay = false;
+
+    if (tossTrigger === 'press') {
+        shakeHint.innerText = "👆 按住畫面不放開始搖卦，鬆開即落幣";
+        shakeHint.style.display = "block";
+        overlay.style.touchAction = 'none';
+
+        result = await new Promise(resolve => {
+            let currentRes = tossThreeCoins();
+            // ★ 保留未來的 APP 震動變數
+            let disturbTimer = null, vibTimer = null, isShaking = false, isDone = false, maxTimeFallback = null;
+            let pressStartTime = 0, startX = 0, startY = 0;
+            let currentVibTime = 20;
+
+            const startShaking = (e) => {
+                if (e && e.cancelable) e.preventDefault();
+                if (isDone || isShaking) return;
+                isShaking = true;
+                pressStartTime = Date.now();
+
+                if (e && e.clientX !== undefined) {
+                    startX = e.clientX;
+                    startY = e.clientY;
+                }
+
+                let moveHint = animCfg.turtleMoveSpeed ? " (滑動可加速)" : "";
+                shakeHint.innerText = `搖動中...${moveHint} (鬆開即可落幣)`;
+                defaultBox.innerHTML = animCfg.tossMode === 'qianlong' ? qianlongShakeHtml : '<div class="anim-emoji" style="animation: spin 0.2s linear infinite;">🌗</div>';
+
+                // ==========================================
+                // TODO: 未來打包為原生 Android APP 時，解開此註解可實現拖曳變速震動
+                // ==========================================
+                /*
+                if (animCfg.turtleVibrate && navigator.vibrate) {
+                    vibTimer = setInterval(() => { 
+                        navigator.vibrate(currentVibTime); 
+                    }, 80); 
+                }
+                */
+
+                disturbTimer = setInterval(() => { currentRes = tossThreeCoins(); }, 30);
+                maxTimeFallback = setTimeout(() => { stopShaking(null); }, 5000);
+            };
+
+            const onMove = (e) => {
+                if (!isShaking || !animCfg.turtleMoveSpeed || animCfg.tossMode !== 'qianlong') return;
+                if (e.clientX === undefined || e.clientY === undefined) return;
+
+                let dist = Math.sqrt(Math.pow(e.clientX - startX, 2) + Math.pow(e.clientY - startY, 2));
+                let effort = Math.min(15, Math.floor(dist / 15));
+                let finalDur = Math.max(0.02, baseDuration - (effort * 0.015));
+
+                currentVibTime = 20 + (effort * 3);
+
+                let turtleBox = document.getElementById('turtle-anim-box');
+                if (turtleBox) {
+                    turtleBox.style.animationDuration = `${finalDur}s`;
+                }
+            };
+
+            const stopShaking = (e) => {
+                if (e && e.cancelable && e.type !== 'pointercancel') e.preventDefault();
+                if (isDone || !isShaking) return;
+
+                let duration = Date.now() - pressStartTime;
+                if (duration < 500 && e !== null) {
+                    isShaking = false;
+                    clearInterval(disturbTimer);
+                    // if (vibTimer) clearInterval(vibTimer); // 未來 APP 用
+                    if (navigator.vibrate) navigator.vibrate(0);
+                    clearTimeout(maxTimeFallback);
+
+                    shakeHint.innerHTML = "⚠️ <span style='color:#dc3545;'>按壓時間太短</span>，請長按不要放";
+                    defaultBox.innerHTML = animCfg.tossMode === 'qianlong' ? qianlongStaticHtml : '<div class="anim-emoji">🌗</div>';
+
+                    setTimeout(() => {
+                        if (!isShaking && !isDone) shakeHint.innerText = "👆 按住畫面不放開始搖卦，鬆開即落幣";
+                    }, 1500);
+                    return;
+                }
+
+                isDone = true;
+                clearInterval(disturbTimer);
+                // if (vibTimer) clearInterval(vibTimer); // 未來 APP 用
+                clearTimeout(maxTimeFallback);
+
+                // ==========================================
+                // ★ 網頁版核心破解：在放開手指的瞬間發送「預約震動」
+                // [微震1ms(騙過瀏覽器), 靜音500ms(等銅錢飛), 震動40ms... (模擬三枚落地)]
+                // ==========================================
+                if (animCfg.tossMode === 'qianlong' && animCfg.turtleVibrate && navigator.vibrate) {
+                    navigator.vibrate([1, 500, 30, 40, 40, 40, 50]);
+                }
+
+                cleanup();
+                resolve(currentRes);
+            };
+
+            const onDown = (e) => startShaking(e);
+            const onUp = (e) => stopShaking(e);
+            const onPointerMove = (e) => onMove(e);
+
+            const cleanup = () => {
+                overlay.style.touchAction = 'auto';
+                overlay.removeEventListener('pointerdown', onDown);
+                document.removeEventListener('pointerup', onUp);
+                document.removeEventListener('pointercancel', onUp);
+                document.removeEventListener('pointermove', onPointerMove);
+            };
+
+            overlay.addEventListener('pointerdown', onDown, { passive: false });
+            document.addEventListener('pointerup', onUp, { passive: false });
+            document.addEventListener('pointercancel', onUp, { passive: false });
+            document.addEventListener('pointermove', onPointerMove, { passive: false });
+        });
+
+        if (animCfg.tossMode !== '3d') skipFixedTossDelay = true;
+    }
+    else {
+        shakeHint.innerText = tossTrigger === 'shake' ? "📳 請搖晃手機開始搖卦..." : "👆 點擊畫面開始搖卦...";
+        shakeHint.style.display = "block";
+        await waitForShakeOrClick();
+        result = tossThreeCoins();
+    }
+
     shakeHint.style.display = "none";
+    msgEl.innerText = "";
 
-    // 3. ★ 提前計算這一次的卦象結果 (兩種模式共用)
-    let outcomes = ["少陰", "少陽", "老陰", "老陽"];
-    let result = outcomes[Math.floor(Math.random() * 4)];
+    // 4. 落幣階段
+    if (animCfg.tossMode === 'qianlong') {
+        let coins = [];
+        if (result === "老陽") coins = [yangSvg, yangSvg, yangSvg];
+        else if (result === "少陰") coins = [yangSvg, yangSvg, yinSvg];
+        else if (result === "少陽") coins = [yangSvg, yinSvg, yinSvg];
+        else if (result === "老陰") coins = [yinSvg, yinSvg, yinSvg];
+        coins.sort(() => Math.random() - 0.5);
 
-    // 4. 根據模式播放「擲幣掉落過程」的動畫
-    if (animCfg.tossMode === '3d') {
+        let dropHtml = `
+        <style>
+            @keyframes drop1 { 0% { transform: translate(0, 30px) scale(0.3); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(-45px, 80px) scale(0.9); opacity: 1; } }
+            @keyframes drop2 { 0% { transform: translate(0, 30px) scale(0.3); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(45px, 80px) scale(0.9); opacity: 1; } }
+            @keyframes drop3 { 0% { transform: translate(0, 30px) scale(0.3); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(0px, 115px) scale(0.9); opacity: 1; } }
+        </style>
+        <div style="position:relative; width:100vw; height:320px;">
+            <div style="position:absolute; top:10px; left:calc(50% - 50px); width:100px; height:120px; background-image:url('${shellSvg}'); background-size:cover; filter: drop-shadow(0 15px 10px rgba(0,0,0,0.6)); z-index:4;"></div>
+            <div style="position:absolute; left:calc(50% - 32.5px); width:65px; height:65px; border-radius:50%; background-image:url('${coins[0]}'); background-size:cover; animation: drop1 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards; z-index:2; top: 30px; box-shadow:0 5px 8px rgba(0,0,0,0.5);"></div>
+            <div style="position:absolute; left:calc(50% - 32.5px); width:65px; height:65px; border-radius:50%; background-image:url('${coins[1]}'); background-size:cover; animation: drop2 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards; z-index:2; top: 30px; box-shadow:0 5px 8px rgba(0,0,0,0.5);"></div>
+            <div style="position:absolute; left:calc(50% - 32.5px); width:65px; height:65px; border-radius:50%; background-image:url('${coins[2]}'); background-size:cover; animation: drop3 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards; z-index:2; top: 30px; box-shadow:0 5px 8px rgba(0,0,0,0.5);"></div>
+        </div>`;
+
+        defaultBox.innerHTML = dropHtml;
+        await new Promise(r => setTimeout(r, 600));
+
+        // 5. 最終印章顯示階段 (絕對定位將印章死死釘在 320px 的最底部)
+        let resultHtml = `
+        <div style="position:relative; width:100vw; height:320px;">
+            <div style="position:absolute; top:10px; left:calc(50% - 50px); width:100px; height:120px; background-image:url('${shellSvg}'); background-size:cover; filter: drop-shadow(0 15px 10px rgba(0,0,0,0.6)); z-index:4;"></div>
+            <div style="position:absolute; left:calc(50% - 32.5px); width:65px; height:65px; border-radius:50%; background-image:url('${coins[0]}'); background-size:cover; transform: translate(-45px, 80px) scale(0.9); z-index:2; top: 30px; box-shadow:0 5px 8px rgba(0,0,0,0.5);"></div>
+            <div style="position:absolute; left:calc(50% - 32.5px); width:65px; height:65px; border-radius:50%; background-image:url('${coins[1]}'); background-size:cover; transform: translate(45px, 80px) scale(0.9); z-index:2; top: 30px; box-shadow:0 5px 8px rgba(0,0,0,0.5);"></div>
+            <div style="position:absolute; left:calc(50% - 32.5px); width:65px; height:65px; border-radius:50%; background-image:url('${coins[2]}'); background-size:cover; transform: translate(0px, 115px) scale(0.9); z-index:2; top: 30px; box-shadow:0 5px 8px rgba(0,0,0,0.5);"></div>
+            <div class="yin-seal ${classMap[result]}" style="position:absolute; bottom:15px; left:50%; transform:translateX(-50%); font-size: 2.5rem; padding: 5px 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); z-index: 10;">${result.slice(0, 2)}</div>
+        </div>`;
+
+        defaultBox.innerHTML = resultHtml;
+        window.lastCastCoins = coins;
+        await new Promise(r => setTimeout(r, animCfg.tmSy * 1000));
+    }
+    else if (animCfg.tossMode === '3d') {
         let defaultFront = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><circle cx='50' cy='50' r='50' fill='%23f1c40f'/><text x='50' y='65' font-size='35' font-weight='bold' font-family='sans-serif' text-anchor='middle' fill='%23bba14f'>人</text></svg>";
         let defaultBack = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><circle cx='50' cy='50' r='50' fill='%23bdc3c7'/><text x='50' y='65' font-size='35' font-weight='bold' font-family='sans-serif' text-anchor='middle' fill='%237f8c8d'>字</text></svg>";
         let frontImg = await localforage.getItem('img_coin_front') || defaultFront;
@@ -255,43 +556,71 @@ async function castRitualFlow(isFirst, yaoName) {
         let coinHtml = `
         <div class="coin-scene">
             ${coinsConfig.map((face, i) => `
-                <div class="coin-wrapper" style="animation: flip-${face} ${animCfg.tmToss}s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; animation-delay: ${i * 0.15}s;">
+                <div class="coin-wrapper" style="animation: flip-${face} ${animCfg.tmToss}s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; animation-delay:${i * 0.15}s;">
                     <div class="coin-face coin-front" style="background-image: url('${frontImg}')"></div>
                     <div class="coin-face coin-back" style="background-image: url('${backImg}')"></div>
                 </div>
             `).join('')}
         </div>`;
 
-        $("anim-img").style.display = "none";
-        $("anim-default").innerHTML = coinHtml;
-        $("anim-default").style.display = "block";
+        defaultBox.innerHTML = coinHtml;
         await new Promise(r => setTimeout(r, (animCfg.tmToss + 0.3) * 1000));
 
-    } else {
-        // 傳統影片/GIF模式
-        await playPhase('img_toss', '<div class="anim-emoji" style="animation: spin 0.5s linear infinite;">🌗</div>', animCfg.tmToss);
+        let sealHtml = `<div class="yin-seal ${classMap[result]}" style="font-size: 3.5rem; padding: 15px 30px; border-radius: 10px;">${result.slice(0, 2)}</div>`;
+        await playPhase(`img_${classMap[result].split('-')[1]}`, sealHtml, animCfg.tmSy);
+    }
+    else {
+        if (!skipFixedTossDelay) {
+            defaultBox.innerHTML = '<div class="anim-emoji" style="animation: spin 0.5s linear infinite;">🌗</div>';
+            await new Promise(r => setTimeout(r, animCfg.tmToss * 1000));
+        }
+        let sealHtml = `<div class="yin-seal ${classMap[result]}" style="font-size: 3.5rem; padding: 15px 30px; border-radius: 10px;">${result.slice(0, 2)}</div>`;
+        await playPhase(`img_${classMap[result].split('-')[1]}`, sealHtml, animCfg.tmSy);
     }
 
-    // 5. ★ 播放結束，顯示最終印章結果 (兩種模式共用)
-    let classMap = { "少陽": "seal-sy", "老陽": "seal-oy", "少陰": "seal-sn", "老陰": "seal-on" };
-    let sealHtml = `<div class="yin-seal ${classMap[result]}" style="font-size: 3.5rem; padding: 15px 30px; border-radius: 10px;">${result.slice(0, 2)}</div>`;
+    let yaoOrder = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"];
+    let currIdx = yaoOrder.indexOf(yaoName);
+    if (currIdx !== -1) {
+        let rowContainer = document.getElementById("yao-sel-" + currIdx);
+        if (rowContainer) {
+            let castBtn = rowContainer.parentElement.querySelector('button');
+            if (castBtn) {
+                castBtn.style.opacity = '0.3';
+                castBtn.style.pointerEvents = 'none';
+                castBtn.style.filter = 'grayscale(100%)';
+                castBtn.style.boxShadow = 'none';
+            }
+        }
+    }
 
-    msgEl.innerText = "";
-    await playPhase(`img_${classMap[result].split('-')[1]}`, sealHtml, animCfg.tmSy);
+    let tempEndMode = animCfg.endMode;
+    let tempEndTime = animCfg.endTime;
+    if (animCfg.tossMode === 'qianlong' && animCfg.turtleAutoNext) {
+        animCfg.endMode = 'auto';
+        animCfg.endTime = 0.8;
+    }
 
-    // 6. 等待使用者點擊或倒數結束，並回傳結果
-    return await handleRitualEnd(result, nextHint, overlay, msgEl);
+    let finalRes = await handleRitualEnd(result, nextHint, overlay, msgEl);
+
+    if (animCfg.tossMode === 'qianlong' && animCfg.turtleAutoNext) {
+        animCfg.endMode = tempEndMode;
+        animCfg.endTime = tempEndTime;
+    }
+
+    return finalRes;
 }
 
 // ★ 加入全域鎖，防止狂點按鈕引發的時序錯亂
 window.isCastingYao = false;
 
-// ★ 手動單爻起卦控制 (強化防護版)
+// ==========================================
+// ★ 手動/連續單爻起卦控制 (包含草稿儲存與黑幕無縫接力)
+// ==========================================
 async function castSingleYao(idx) {
-    // 1. 防連點：如果正在播放動畫或正在處理中，直接攔截不反應
+    // 1. 防連點
     if (window.isCastingYao) return;
 
-    // 2. 順序防呆：檢查是不是按照順序點擊
+    // 2. 順序防呆
     if (idx !== AppState.currentCastStep) {
         if (window.showAlert) {
             window.showAlert(AppState.currentCastStep === 0
@@ -301,33 +630,59 @@ async function castSingleYao(idx) {
         return;
     }
 
-    // 3. 正式進入儀式：上鎖！
+    // 3. 上鎖
     window.isCastingYao = true;
 
-    // ★ 4. 鎖死下拉選單：一旦開始擲幣，不允許再手動偷改任何選單
+    // 鎖死下拉選單
     for (let i = 0; i < 6; i++) {
         let sel = document.getElementById("yao-sel-" + i);
         if (sel) sel.disabled = true;
     }
 
-    // 5. 播放儀式動畫並取得結果
     let yaoNames = ['初爻', '二爻', '三爻', '四爻', '五爻', '上爻'];
     let result = await castRitualFlow(idx === 0, yaoNames[idx]);
 
     // 填入資料並更新印章
-    $(`yao-sel-${idx}`).value = result;
+    let selTarget = document.getElementById(`yao-sel-${idx}`);
+    if (selTarget) selTarget.value = result;
     updateYaoSeal(idx);
 
-    $("anim-overlay").style.display = "none";
     AppState.currentCastStep++;
 
-    // 6. 儀式結束：解鎖！
+    // ★ 在前 5 爻時才存草稿，第 6 爻會直接正式排盤
+    if (AppState.currentCastStep < 6 && typeof window.saveDraftToHistory === 'function') {
+        window.saveDraftToHistory();
+    }
+
+    // ★ 檢查是否啟用「連續起爻」
+    let autoNextCb = document.getElementById("auto-next-yao");
+    let isAutoNext = autoNextCb && autoNextCb.checked && AppState.currentCastStep < 6;
+
+    // 如果沒有勾連續起爻，才把防護黑幕關掉
+    if (!isAutoNext) {
+        document.getElementById("anim-overlay").style.display = "none";
+    } else {
+        // 若勾選連續，黑幕保持常駐！直接將文字切換為下一爻的準備狀態
+        let msgEl = document.getElementById("anim-msg");
+        if (msgEl) msgEl.innerText = `準備起【${yaoNames[AppState.currentCastStep]}】...`;
+    }
+
+    // 暫時解鎖，以利觸發下一爻或排盤
     window.isCastingYao = false;
 
-    // 若六爻皆已完成，歸零並觸發排盤
+    // ★ 路由分發
     if (AppState.currentCastStep >= 6) {
+        document.getElementById("anim-overlay").style.display = "none"; // 六爻完畢，強制關閉黑幕
         AppState.currentCastStep = 0;
-        startManual();
+
+        // ★ 完美修復：正確帶入起卦方式標籤
+        startManual("A 電腦起爻");
+
+    } else if (isAutoNext) {
+        // ★ 無縫接力：延遲 400 毫秒後，直接在背景自動呼叫下一爻 (黑幕全程保護)
+        setTimeout(() => {
+            castSingleYao(AppState.currentCastStep);
+        }, 400);
     }
 }
 
@@ -359,7 +714,7 @@ async function startAutoWithAnim() {
     document.getElementById("anim-overlay").style.display = "none";
     if (window.AppState) window.AppState.currentCastStep = 0; // 重置
     // 觸發原本的畫盤流程
-    if (typeof startManual === 'function') startManual();
+    if (typeof startManual === 'function') startManual("A 電腦起卦");
 }
 
 // 同步更新陰刻印章與棒棒圖
@@ -536,7 +891,7 @@ window.copyGasTutorial = function () {
 };
 
 // ==========================================
-// ★ 清空首頁起卦面板狀態 (包含解鎖)
+// ★ 清空首頁起卦面板狀態 (包含解鎖與解除反灰)
 // ==========================================
 function resetManualUI() {
     for (let i = 0; i < 6; i++) {
@@ -546,25 +901,72 @@ function resetManualUI() {
         // 1. 清空下拉選單，並【解除禁用鎖定】
         if (sel) {
             sel.value = "";
-            sel.disabled = false; // ★ 恢復為可手動選擇
+            sel.disabled = false;
         }
 
         // 2. 隱藏並清空印章
         if (seal) {
-            seal.className = "yin-seal"; // 移除顏色特效 class
+            seal.className = "yin-seal";
             seal.style.display = "none";
             seal.innerText = "";
         }
+
+        // 3. ★ 核心修復：解除按鈕的反灰鎖死狀態
+        let rowContainer = document.getElementById("yao-sel-" + i);
+        if (rowContainer) {
+            let castBtn = rowContainer.parentElement.querySelector('button');
+            if (castBtn) {
+                castBtn.style.opacity = '1';
+                castBtn.style.pointerEvents = 'auto';
+                castBtn.style.filter = 'none';
+                castBtn.style.boxShadow = '0 1px 2px rgba(0,0,0,0.2)'; // 恢復原本 CSS 的立體陰影
+            }
+        }
     }
 
-    // 3. 清空占卜問題欄位
+    // 4. 清空占卜問題欄位
     let qInput = document.getElementById("p-question");
     if (qInput) qInput.value = "";
 
-    // 4. 把起爻進度歸零
+    // 5. 把起爻進度歸零
     if (window.AppState) {
         window.AppState.currentCastStep = 0;
     }
+
+    // 6. 解除全域起卦鎖定，避免有時中斷造成的按鈕卡死
+    window.isCastingYao = false;
+
+    // 7. 清除緊急儲存草稿
+    localStorage.removeItem("ly_yao_draft");
+
+    // 8. 當正式排盤完成後，自動從資料庫把剛才的草稿刪除！
+    if (window.currentDraftId) {
+        localforage.getItem('iching_final_v60').then(recs => {
+            if (recs) {
+                let draftIdx = recs.findIndex(r => r.id === window.currentDraftId);
+                if (draftIdx !== -1) {
+                    recs.splice(draftIdx, 1);
+                    localforage.setItem('iching_final_v60', recs).then(() => {
+                        // 如果背景剛好在紀錄列表，順便幫它重整畫面
+                        if (window.location.hash === '#records' && typeof window.showRecords === 'function') {
+                            window.showRecords(true);
+                        }
+                    });
+                }
+            }
+            window.currentDraftId = null;
+        });
+    }
+
+    // 9. 恢復首頁標題 (若從草稿進來的話)
+    if (typeof window.restorePortalUI === 'function') {
+        window.restorePortalUI();
+    }
+
+    // 10. 核心修復：強制關閉起爻動畫黑幕與震動 (防返回鍵卡死)
+    let overlay = document.getElementById("anim-overlay");
+    if (overlay) overlay.style.display = "none";
+    if (navigator.vibrate) navigator.vibrate(0);
 }
 
 // ==========================================
@@ -825,75 +1227,77 @@ function handleRouting(event) {
     let oldHash = event && event.oldURL ? (new URL(event.oldURL)).hash : "";
 
     // ==========================================
-    // ★ 彈窗虛擬路由處理區塊
+    // ★ 處理修改紀錄彈窗 (#editrec) 手機返回鍵攔截
     // ==========================================
-    // 1. 如果離開了 #lymodal，代表要關閉彈窗 (不管是按實體返回鍵還是點擊視窗按鈕)
-    if (oldHash === "#lymodal" && hash !== "#lymodal") {
-        let overlay = document.getElementById('ly-smart-modal-overlay');
-        if (overlay && window._lyModalPromiseResolver) {
-            overlay.style.animation = "smartFadeOut 0.2s forwards";
-            if (overlay.firstChild) overlay.firstChild.style.animation = "smartBoxFadeOut 0.2s forwards";
-
-            let resolveFn = window._lyModalPromiseResolver;
-            let resultVal = window._lyModalCancelValue;
-            window._lyModalPromiseResolver = null; // 清空避免重複觸發
-
+    if (oldHash === "#editrec" && hash !== "#editrec") {
+        let overlay = document.getElementById('smart-edit-overlay');
+        if (overlay) {
+            overlay.style.animation = "fadeOut 0.2s forwards";
+            if (overlay.firstChild) overlay.firstChild.style.animation = "fadeOut 0.2s forwards";
             setTimeout(() => {
                 overlay.remove();
                 document.body.style.overflow = "";
-                resolveFn(resultVal);
+                document.body.style.height = "";
+                let recView = document.getElementById("records-view");
+                if (recView) recView.style.overflow = "auto";
             }, 200);
         }
     }
 
-    // 2. 如果進入了 #lymodal，直接中斷路由渲染，讓背後的結果頁維持原樣！
-    if (hash === "#lymodal") {
+    // ★ 處理自訂警告彈窗 (#lymodal) 的清除與 Promise 釋放
+    if (oldHash === "#lymodal" && hash !== "#lymodal") {
+        let overlay = document.getElementById('ly-smart-modal-overlay');
+        if (overlay) {
+            overlay.style.animation = "smartFadeOut 0.2s forwards";
+            if (overlay.firstChild) overlay.firstChild.style.animation = "smartBoxFadeOut 0.2s forwards";
+            setTimeout(() => {
+                overlay.remove();
+                if (typeof window._lyModalPromiseResolver === 'function') {
+                    window._lyModalPromiseResolver(window._lyModalCancelValue);
+                    window._lyModalPromiseResolver = null;
+                }
+            }, 200);
+        }
+    }
+
+    // 如果進入了彈窗，直接中斷路由渲染，讓背後的結果頁維持原樣！
+    if (hash === "#lymodal" || hash === "#editrec") {
         return;
     }
-    // ==========================================
 
     // ⛔ 攔截 1：離開排盤結果頁 (#result)
     if (oldHash === "#result" && hash !== "#result") {
-
-        // ★ 防連點補救：如果正在跳出詢問視窗，直接吸收掉多餘的返回鍵！
         if (window._isConfirmingExit) {
-            history.pushState(null, "", "#result"); // 強制拉回，不給穿透
+            history.pushState(null, "", "#result");
             return;
         }
 
-        let subject = document.getElementById("edit-subject")?.value || "";
-        let judge = document.getElementById("edit-judge")?.value || "";
-        let feedback = document.getElementById("edit-feedback")?.value || "";
-        let note = document.getElementById("edit-note")?.value || "";
-        let currentNotes = JSON.stringify({ subject, judge, feedback, note });
+        let currentStateStr = typeof window.getCurrentStateSnapshotString === 'function' ? window.getCurrentStateSnapshotString() : "";
+        let notesChanged = (currentStateStr !== window.recordNotesSnapshot);
+        window.recordNotesSnapshot = window.getCurrentStateSnapshotString();
 
-        let notesChanged = (currentNotes !== window.recordNotesSnapshot);
         let hasValidData = window.AppState && window.AppState.curData && window.AppState.curData.lines;
-        let isNewDivination = !window.comesFromRecords && hasValidData;
+        let noteInput = document.getElementById("edit-note");
+        let isUnlocked = noteInput && !noteInput.readOnly;
 
-        // 只有「全新且未儲存」或「舊紀錄但被改過筆記」，才會攔截
-        if (hasValidData && (isNewDivination || notesChanged)) {
+        if (hasValidData) {
+            if (isUnlocked && notesChanged) {
+                window._isConfirmingExit = true;
+                history.pushState(null, "", "#result");
 
-            window._isConfirmingExit = true; // ★ 扣上防連點鎖
-            history.pushState(null, "", "#result"); // 強制覆蓋回 #result
-
-            window.showConfirm("⚠️ 您有未儲存的紀錄或變更，確定要直接離開嗎？\n(離開後將自動為您「預防暫存」)").then(ok => {
-
-                window._isConfirmingExit = false; // ★ 視窗關閉，解開鎖定
-
-                if (ok) {
-                    // 使用者確定要放棄當前進度離開，觸發預防暫存
-                    if (typeof window.emergencySave === 'function') window.emergencySave();
-                    window.recordNotesSnapshot = currentNotes;
-                    window.comesFromRecords = true;
-                    window.location.replace(hash);
-                }
-            });
-            return; // 中斷路由
+                window.showConfirm("⚠️ 您的筆記有修改但尚未更新（上鎖），確定要直接離開嗎？\n(離開將為您暫存目前的輸入狀態)").then(ok => {
+                    window._isConfirmingExit = false;
+                    if (ok) {
+                        window.emergencySave();
+                        window.comesFromRecords = true;
+                        window.location.replace(hash);
+                    }
+                });
+                return;
+            } else {
+                window.emergencySave();
+            }
         }
-
-        // 💡 如果已經儲存過 (isNewDivination 為 false 且 notesChanged 為 false)
-        // 程式就會順利通過這裡，直接回到首頁或紀錄頁，絕對不會再跳出 showConfirm！
     }
 
     // ⛔ 攔截 2：離開系統設定頁 (#settings)
@@ -910,7 +1314,7 @@ function handleRouting(event) {
 
         if (changedNames.length > 0) {
             window._ignoreHashChange = true;
-            window.location.hash = "#settings"; // 強制鎖回設定頁
+            window.location.hash = "#settings";
 
             let diffMsgBox = document.getElementById("settings-diff-msg");
             if (diffMsgBox) diffMsgBox.innerHTML = `📝 <b>您變更了：</b><br>${changedNames.join("、")}`;
@@ -921,14 +1325,12 @@ function handleRouting(event) {
     }
 
     // --- 視窗顯示控制 ---
-    // 預設先隱藏所有 Modal，確保乾淨
     let tModal = document.getElementById("time-modal");
     let sModal = document.getElementById("settings-modal");
     if (tModal) tModal.style.display = "none";
     if (sModal) sModal.style.display = "none";
     document.body.style.overflow = "";
 
-    // 如果網址是 Modal，打開它並中斷底層渲染
     if (hash === "#time") {
         if (tModal) { tModal.style.display = "flex"; document.body.style.overflow = "hidden"; }
         return;
@@ -938,19 +1340,69 @@ function handleRouting(event) {
         return;
     }
 
-    // --- 主畫面切換 ---
-    document.getElementById("portal-view").style.display = "none";
-    document.getElementById("records-view").style.display = "none";
-    document.getElementById("result-view").style.display = "none";
+    // ==========================================
+    // ★ 捲軸記憶與精準隱藏系統 (已修復大括號與塌陷問題)
+    // ==========================================
+    let pView = document.getElementById("portal-view");
+    let rView = document.getElementById("records-view");
+    let resView = document.getElementById("result-view");
+    let tView = document.getElementById("trash-view");
 
+    // 1. 離開列表時，紀錄高度
+    if (oldHash === "#records" && rView && rView.style.display !== "none") {
+        window.lastRecScrollPos = rView.scrollTop;
+    }
+
+    // ★ 絕殺 1：精準隱藏！只隱藏「不是目標」的畫面，絕對不讓目標畫面經歷 display: none
+    if (hash !== "#home" && hash !== "" && pView) pView.style.display = "none";
+    if (hash !== "#records" && rView) rView.style.display = "none";
+    if (hash !== "#result" && resView) resView.style.display = "none";
+    if (hash !== "#trash" && tView) tView.style.display = "none";
+
+    // 脫掉暗黑濾鏡
+    if (hash !== "#result" && hash !== "#editrec" && hash !== "#lymodal") {
+        document.documentElement.classList.remove('recycle-bin-preview-mode');
+    }
+
+    // --- 路由畫面切換 ---
     if (hash === "#records") {
-        document.getElementById("records-view").style.display = "block";
+        if (rView) {
+            rView.style.display = "block";
+        }
+
+        let renderPromise = null;
         if (typeof showRecords === 'function') {
-            showRecords(oldHash === "#result");
+            renderPromise = showRecords(oldHash === "#result");
+        }
+
+        // ★ 絕殺：列表專屬還原，同時釘死內部與外部捲軸！
+        const restoreScroll = () => {
+            let targetPos = window.lastRecScrollPos || 0;
+            if (rView) rView.scrollTop = targetPos;
+            window.scrollTo(0, targetPos);
+
+            let retryCount = 0;
+            if (window.lyScrollInterval) clearInterval(window.lyScrollInterval);
+            window.lyScrollInterval = setInterval(() => {
+                if (rView && rView.scrollTop !== targetPos) rView.scrollTop = targetPos;
+                if (window.scrollY !== targetPos) window.scrollTo(0, targetPos);
+                retryCount++;
+                if (retryCount >= 10) clearInterval(window.lyScrollInterval);
+            }, 30);
+        };
+
+        if (renderPromise && typeof renderPromise.then === 'function') {
+            renderPromise.then(() => setTimeout(restoreScroll, 20));
+        } else {
+            setTimeout(restoreScroll, 300);
         }
     }
+    else if (hash === "#trash") {
+        if (tView) tView.style.display = "flex";
+        if (typeof showTrash === 'function') showTrash();
+    }
     else if (hash === "#result") {
-        // ★ 防呆：如果是重新整理，記憶體被清空，強制退回首頁
+        // 防呆：如果是重新整理，記憶體被清空，強制退回首頁
         if (!window.AppState || !window.AppState.curData || !window.AppState.curData.lines) {
             window._ignoreHashChange = true;
             window.location.hash = "#home";
@@ -958,98 +1410,185 @@ function handleRouting(event) {
             return;
         }
 
-        document.getElementById("result-view").style.display = "flex";
+        let resView = document.getElementById("result-view");
+        if (resView) {
+            resView.style.display = "flex";
+        }
+
+        // 1. 強制歸零，防止被舊記錄的捲軸殘留干擾
+        if (resView) resView.scrollTop = 0;
+        window.scrollTo(0, 0);
+
+        // ==========================================
+        // ★ 終極修復：四柱精準定位 (放棄動畫，直接絕對賦值)
+        // ==========================================
+        setTimeout(() => {
+            let bzDay = document.getElementById("bz-d");
+
+            if (bzDay && resView) {
+                let parentLine = bzDay.closest('div[style*="border-top"]');
+                let anchor = parentLine ? parentLine : document.getElementById("bazi-anchor") || bzDay;
+
+                // 遞迴計算元素的絕對物理高度 (最穩定，完全不受捲動狀態干擾)
+                let offset = 0;
+                let curr = anchor;
+                while (curr && curr !== resView && curr !== document.body) {
+                    offset += curr.offsetTop;
+                    curr = curr.offsetParent;
+                }
+
+                // 扣除 55px (閃過導覽列並保留呼吸空間)
+                let targetOffset = Math.max(0, offset - 55);
+
+                // ★ 暴力直接寫入，不依賴任何瀏覽器動畫行為
+                resView.scrollTop = targetOffset;
+
+                // 補槍防護：延遲 100 毫秒後，若捲軸被其他 DOM 撐開擠掉，強制再拉回！
+                setTimeout(() => {
+                    if (resView.scrollTop !== targetOffset) {
+                        resView.scrollTop = targetOffset;
+                    }
+                }, 100);
+            }
+        }, 150); // 確保畫面 100% 渲染完成才計算
+
         if (oldHash !== "#result") {
-            // 進入結果頁時，自動將起卦問題或歷史主旨帶入輸入框
             let editSub = document.getElementById("edit-subject");
             if (editSub && window.AppState && window.AppState.curData) {
                 editSub.value = window.AppState.curData.subject || window.AppState.curData.question || "";
             }
-
-            // 建立包含 subject 的完整快照
-            let subject = document.getElementById("edit-subject")?.value || "";
-            let judge = document.getElementById("edit-judge")?.value || "";
-            let feedback = document.getElementById("edit-feedback")?.value || "";
-            let note = document.getElementById("edit-note")?.value || "";
-            window.recordNotesSnapshot = JSON.stringify({ subject, judge, feedback, note });
+            if (typeof window.getCurrentStateSnapshotString === 'function') {
+                window.recordNotesSnapshot = window.getCurrentStateSnapshotString();
+            }
         }
     }
     else {
         // #home 以及其他預設情況
-        document.getElementById("portal-view").style.display = "block";
-        window.comesFromRecords = false; // 確保回到首頁必定洗掉歷史紀錄狀態
+        if (pView) pView.style.display = "block";
+        window.comesFromRecords = false;
+        window.lastRecScrollPos = 0; // 首頁歸零，確保新進列表置頂
 
-        // ★ 核心新增：手機返回鍵的「離開系統」陷阱機制 (Double Push Trap)
-        // 只要回到首頁，如果沒有陷阱，我們就悄悄佈置一個
         if (!history.state || history.state.trap !== 'active') {
             history.replaceState({ trap: 'base' }, "", "#home");
             history.pushState({ trap: 'active' }, "", "#home");
         }
 
-        let subjectInput = document.getElementById("p-question");
-        if (subjectInput) subjectInput.value = "";
+        // ✅ 只有從「結果頁」返回、或「剛開網頁」時才執行
+        if (oldHash === "#result" || oldHash === "") {
+            let subjectInput = document.getElementById("p-question");
+            if (subjectInput) subjectInput.value = "";
 
-        let d = new Date();
-        let yearEl = document.getElementById("ts-year");
-        if (yearEl) {
-            yearEl.value = d.getFullYear();
-            document.getElementById("ts-month").value = d.getMonth();
-            document.getElementById("ts-day").value = d.getDate();
-            document.getElementById("ts-hour").value = d.getHours();
-            document.getElementById("ts-minute").value = d.getMinutes();
+            // ★ 修正 3：返回首頁時，自動呼叫「帶入時位」，讓經緯度與最新時間自動歸位！
+            if (typeof window.autoLocateCity === 'function') {
+                setTimeout(window.autoLocateCity, 150);
+            } else {
+                // 降級備用方案
+                let d = new Date();
+                let yearEl = document.getElementById("ts-year");
+                if (yearEl) {
+                    yearEl.value = d.getFullYear();
+                    document.getElementById("ts-month").value = d.getMonth();
+                    document.getElementById("ts-day").value = d.getDate();
+                    document.getElementById("ts-hour").value = d.getHours();
+                    document.getElementById("ts-minute").value = d.getMinutes();
+                }
+                if (typeof window.syncStatusMsg === 'function') {
+                    window.syncStatusMsg("🕒 目前時間", "📍 預設地點");
+                }
+            }
         }
     }
 }
-
 window.addEventListener("hashchange", handleRouting);
 
 // ==========================================
-// ★ 終極防線：預防暫存系統 (Emergency Save)
+// ★ 絕對起卦時間排序引擎 (永遠依據起卦時間降冪排序)
+// ==========================================
+window.sortRecordsByDivinationTime = function (recs) {
+    recs.sort((a, b) => {
+        // 抓取 dateStr (如 "2026-03-15 14:30" 或 "2026/03/15") 並轉換為時間戳
+        let timeA = new Date((a.dateStr || "").replace(/-/g, '/')).getTime() || 0;
+        let timeB = new Date((b.dateStr || "").replace(/-/g, '/')).getTime() || 0;
+        return timeB - timeA; // 降冪排序：最新起卦的在最上方
+    });
+};
+
+// ==========================================
+// ★ 全域狀態快照擷取器 (包含筆記、應期、繪圖與排盤 UI 設定)
+// ==========================================
+window.getCurrentStateSnapshotString = function () {
+    if (!window.AppState || !window.AppState.curData) return "";
+    return JSON.stringify({
+        subject: document.getElementById("edit-subject")?.value || window.AppState.curData.question || "未命名卦象",
+        judge: document.getElementById("edit-judge")?.value || "",
+        feedback: document.getElementById("edit-feedback")?.value || "",
+        note: document.getElementById("edit-note")?.value || "",
+        currentStatus: document.getElementById("edit-current-status")?.value || "", // ★ 新增
+        copyAddon: document.getElementById("edit-copy-addon")?.value || "", // ★ 新增
+        yingqi: typeof window.getSettingsYingqiSnapshot === 'function' ? window.getSettingsYingqiSnapshot() : {},
+        najia: window.AppState.curData.najiaValue,
+        fushen: window.AppState.curData.fushenValue,
+        bian: window.AppState.curData.bianViewValue,
+        draw: window.AppState.isDrawModeEnabled
+    });
+};
+
+// ==========================================
+// ★ 終極防線：離開時自動儲存 (僅限 UI 與應期狀態，絕對不偷存文字)
 // ==========================================
 window.emergencySave = function () {
-    // 1. 確保目前真的有排盤結果資料
     if (!window.AppState || !window.AppState.curData || !window.AppState.curData.lines) return;
+    // ★ 新增防線：如果是回收桶預覽模式，絕對禁止背景偷存！
+    if (window.AppState.curData.isTrashPreview) return;
+    let currentStateStr = window.getCurrentStateSnapshotString();
+    let stateObj = JSON.parse(currentStateStr);
 
-    // 2. 抓取畫面上目前的筆記內容
-    let subject = document.getElementById("edit-subject")?.value || "";
-    let judge = document.getElementById("edit-judge")?.value || "";
-    let feedback = document.getElementById("edit-feedback")?.value || "";
-    let note = document.getElementById("edit-note")?.value || "";
-    let currentNotes = JSON.stringify({ subject, judge, feedback, note });
+    // ★ 權責分離：嚴格判定 UI 與應期狀態是否有變 (完全不管文字欄位)
+    let isUiChanged = false;
+    let oldYingqiStr = JSON.stringify(window.AppState.curData.yingqi || {});
+    let newYingqiStr = JSON.stringify(stateObj.yingqi || {});
 
-    // 3. 判斷是否有儲存的價值 (全新未存盤，或舊盤但筆記有修改)
-    let notesChanged = (currentNotes !== window.recordNotesSnapshot);
-    let isNewDivination = !window.comesFromRecords;
+    if (oldYingqiStr !== newYingqiStr) isUiChanged = true;
+    if (window.AppState.curData.isDrawModeEnabled !== stateObj.draw) isUiChanged = true;
+    if (window.AppState.curData.najiaValue !== stateObj.najia) isUiChanged = true;
+    if (window.AppState.curData.fushenValue !== stateObj.fushen) isUiChanged = true;
+    if (window.AppState.curData.bianViewValue !== stateObj.bian) isUiChanged = true;
 
-    if (isNewDivination || notesChanged) {
-        // ★ 核心要求：在主題後面加上預防暫存標籤
-        let q = window.AppState.curData.question || "未命名卦象";
-        if (!q.includes("預防暫存")) {
-            window.AppState.curData.question = q + " (預防暫存)";
-        }
+    // 如果 UI 狀態有變，或者這是一支尚未存過的新卦
+    if (window.hasUnsavedChanges || isUiChanged) {
+        // 【核心精神】只將 UI 與應期寫入記憶體，文字欄位(subject/note等)放生不存，維持原狀！
+        window.AppState.curData.yingqi = stateObj.yingqi;
+        window.AppState.curData.isDrawModeEnabled = stateObj.draw;
+        if (stateObj.najia) window.AppState.curData.najiaValue = stateObj.najia;
+        if (stateObj.fushen) window.AppState.curData.fushenValue = stateObj.fushen;
+        if (stateObj.bian) window.AppState.curData.bianViewValue = stateObj.bian;
 
-        // 把畫面上的筆記同步進記憶體
-        window.AppState.curData.judge = judge;
-        window.AppState.curData.feedback = feedback;
-        window.AppState.curData.note = note;
-
-        // ★ Fire and forget：搶在網頁被徹底殺死前，將資料寫入 IndexedDB
+        // 寫入資料庫並強制套用起卦時間排序
         localforage.getItem('iching_final_v60').then(recs => {
             recs = recs || [];
             let cloneData = JSON.parse(JSON.stringify(window.AppState.curData));
 
             if (window.AppState.curRecIndex > -1) {
-                recs[window.AppState.curRecIndex] = cloneData; // 覆寫舊紀錄
+                recs[window.AppState.curRecIndex] = cloneData;
             } else {
-                recs.unshift(cloneData); // 新盤插在最前面
+                recs.unshift(cloneData);
             }
+
+            // ★ 套用絕對起卦時間排序
+            if (typeof window.sortRecordsByDivinationTime === 'function') {
+                window.sortRecordsByDivinationTime(recs);
+                // 排序後位置會變，重新定位當前索引
+                window.AppState.curRecIndex = recs.findIndex(r => r.id === cloneData.id);
+            }
+
             localforage.setItem('iching_final_v60', recs);
         }).catch(e => console.log("預防暫存失敗", e));
 
-        // 標記為已處理，避免後續重複觸發
-        window.comesFromRecords = true;
-        window.recordNotesSnapshot = currentNotes;
+        window.hasUnsavedChanges = false;
     }
+
+    // 無論如何，更新防線基準，這樣下一次就不會誤判
+    window.recordNotesSnapshot = window.getCurrentStateSnapshotString();
 };
 
 // ==========================================
@@ -1068,6 +1607,11 @@ window.addEventListener('beforeunload', function (e) {
 // ★ 2. 終極大腦 Popstate：統管首頁退出陷阱與急救
 // ==========================================
 window.addEventListener('popstate', function (e) {
+    // ★ 優先防線：如果使用者按返回鍵時有面板開著，先將其關閉，並直接攔截後續的退出系統邏輯
+    if (typeof window.closeActivePanels === 'function' && window.closeActivePanels()) {
+        return;
+    }
+
     // 如果畫面上有彈窗，代表這次返回是為了關閉 #lymodal，直接放行給 Router
     if (document.getElementById('ly-smart-modal-overlay')) return;
 
@@ -1082,9 +1626,7 @@ window.addEventListener('popstate', function (e) {
         if (qInput && qInput.value.trim() !== "") hasData = true;
 
         const exitSystem = () => {
-            // ★ 系統被強制登出前，觸發最後的預防暫存！
             window.emergencySave();
-
             if (window.clearAllHighlights) window.clearAllHighlights();
             window.close();
             history.go(-100);
@@ -1114,10 +1656,6 @@ window.addEventListener('popstate', function (e) {
                 }
             });
         } else {
-            //window.showConfirm("⚠️ 確定要結束並離開系統嗎？\n(確認後將為您保留設定並安全跳出)").then(ok => {
-            //    if (ok) exitSystem(); else history.pushState({ trap: 'active' }, "", "#home");
-            //});
-            // 如果完全沒有填寫資料，就直接放行，立刻登出系統！
             exitSystem();
         }
     }
@@ -1125,13 +1663,22 @@ window.addEventListener('popstate', function (e) {
 
 // --- 2. 攔截按鈕：精確控制返回節點 ---
 window.goBackPortal = function () {
+    document.documentElement.classList.remove('recycle-bin-preview-mode');
+    if (typeof window.emergencySave === 'function') {
+        window.emergencySave();
+    }
+    // ★ 優先防線：檢查是否有開啟的萬年曆或抽屜，有話就先收合它，不跳轉頁面
+    if (typeof window.closeActivePanels === 'function' && window.closeActivePanels()) {
+        return;
+    }
+
     let editOverlay = document.getElementById("smart-edit-overlay");
     if (editOverlay) {
         let btnCancel = document.getElementById("smart-btn-cancel");
         if (btnCancel) { btnCancel.click(); return; }
     }
 
-    // ★ 智能判斷：從結果頁返回，看來源決定去紀錄頁還是首頁；從紀錄頁則返回首頁。
+    // ★ 系統原有的智慧路由判斷
     if (window.location.hash === "#result") {
         window.location.hash = window.comesFromRecords ? "#records" : "#home";
     } else {
@@ -1145,6 +1692,22 @@ window.goBackPortal = function () {
 window.lyScrollTimeout = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // ==========================================
+    // ★ 模組解耦：檢查萬年曆與應期系統是否存在
+    // ==========================================
+    if (typeof window.renderCalendarGrid !== 'function' || typeof Lunar === 'undefined') {
+        // 隱藏核心應期區塊
+        let coreHud = document.getElementById("core-yingqi-hud");
+        if (coreHud) coreHud.style.display = "none";
+
+        // 隱藏右側漂浮的尋找應期按鈕 (包含舊版🎯與新版扁長按鈕)
+        let yqBtn = document.querySelector('button[title="尋找應期"], #yingqi-toggle-btn, #btn-show-core-yingqi');
+        if (yqBtn) yqBtn.style.display = "none";
+
+        // 隱藏側拉抽屜裡的萬年曆按鈕
+        let drawerCalBtn = document.getElementById("drawer-btn-calendar");
+        if (drawerCalBtn) drawerCalBtn.style.display = "none";
+    }
     // 1. 初始化路由
     if (!window.location.hash) {
         window.location.hash = "#home";
@@ -1268,29 +1831,40 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // ★ 檢查是否存在 KEY，決定是否顯示雲端開關與提示
+    // ★ 檢查雲端模組狀態，決定是否顯示雲端開關與提示
     // ==========================================
     window.checkCloudKeyStatus = async function () {
         let containerHome = document.getElementById("auto-sync-container-home");
         let containerSettings = document.getElementById("auto-sync-container-settings");
         let hintMsg = document.getElementById("built-in-key-hint");
 
+        // 抓取側拉抽屜裡的備份與還原按鈕
+        let btnUpload = document.getElementById("drawer-btn-upload");
+        let btnDownload = document.getElementById("drawer-btn-download");
+
         let customKey = await localforage.getItem('customDbConfig');
         let hasCustomKey = customKey && customKey.trim().length > 0;
         let hasBuiltInKey = window.hasBuiltInFirebaseKey === true;
+
+        // ★ 核心防護：如果 Firebase 模組載入失敗 (成為純離線模式)，強制關閉所有雲端 UI
+        if (typeof window.uploadEverything !== 'function' || window.uploadEverything.toString().includes('純離線模式')) {
+            hasBuiltInKey = false;
+            hasCustomKey = false;
+        }
+
         let shouldShow = hasCustomKey || hasBuiltInKey;
 
-        // 1. 同時控制兩個開關的顯示狀態
+        // 控制首頁與設定頁的自動同步開關
         if (containerHome) containerHome.style.display = shouldShow ? "flex" : "none";
         if (containerSettings) containerSettings.style.display = shouldShow ? "flex" : "none";
 
-        // 2. 控制內建連線的提示文字
+        // 控制側拉抽屜的上下傳按鈕
+        if (btnUpload) btnUpload.style.display = shouldShow ? "flex" : "none";
+        if (btnDownload) btnDownload.style.display = shouldShow ? "flex" : "none";
+
+        // 控制內建連線的綠字提示
         if (hintMsg) {
-            if (hasBuiltInKey && !hasCustomKey) {
-                hintMsg.style.display = "block";
-            } else {
-                hintMsg.style.display = "none";
-            }
+            hintMsg.style.display = (hasBuiltInKey && !hasCustomKey) ? "block" : "none";
         }
     };
 
@@ -1301,27 +1875,24 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('click', function (e) {
     let btn = e.target.closest('#btn-update-rec');
     if (btn) {
-        // ★ 抓取 edit-subject 的值
-        let subject = document.getElementById("edit-subject")?.value || "";
-        let judge = document.getElementById("edit-judge")?.value || "";
-        let feedback = document.getElementById("edit-feedback")?.value || "";
-        let note = document.getElementById("edit-note")?.value || "";
+        // ★ 使用全域狀態快照比對
+        let currentStateStr = window.getCurrentStateSnapshotString();
 
-        // ★ 將 subject 加入要更新的物件中
-        let currentNotes = JSON.stringify({ subject, judge, feedback, note });
-
-        if (currentNotes === window.recordNotesSnapshot) {
+        if (currentStateStr === window.recordNotesSnapshot) {
             e.stopImmediatePropagation();
             e.preventDefault();
-            if (window.showToast) window.showToast("ℹ️ 占斷與筆記內容未有任何異動！");
+            if (window.showToast) window.showToast("ℹ️ 占斷、筆記與應期內容未有任何異動！");
 
             // 【核心修復】內容沒變時，手動執行欄位鎖定與按鈕還原
             let sEl = document.getElementById("edit-subject");
             let jEl = document.getElementById("edit-judge");
             let fEl = document.getElementById("edit-feedback");
             let nEl = document.getElementById("edit-note");
+            let csEl = document.getElementById("edit-current-status"); 
+            let caEl = document.getElementById("edit-copy-addon"); 
+            let cbAddon = document.getElementById("cb-default-addon"); // ★ 抓取 checkbox
 
-            [sEl, jEl, fEl, nEl].forEach(el => {
+            [sEl, jEl, fEl, nEl, csEl, caEl].forEach(el => {
                 if (el) {
                     el.readOnly = true;
                     el.style.backgroundColor = "#e9ecef";
@@ -1331,11 +1902,66 @@ document.addEventListener('click', function (e) {
                 }
             });
 
+            // ★ 強制將 checkbox 設為不可點擊 (鎖死)
+            if (cbAddon) cbAddon.disabled = true;
+
             let eBtn = document.getElementById("btn-edit-notes");
             let uBtn = document.getElementById("btn-update-rec");
             if (uBtn) uBtn.style.display = "none";
             if (eBtn) eBtn.style.display = "inline-block";
             return false;
+        } else {
+            if (window.AppState && window.AppState.curData) {
+                window.AppState.curData.yingqi = JSON.parse(currentStateStr).yingqi;
+            }
         }
     }
 }, true);
+
+// ==========================================
+// ★ 雲端備份與還原的 UI 封裝 (加入太極圖動畫過場)
+// ==========================================
+window.handleCloudBackup = async function () {
+    // ==========================================
+    // ★ 安全鎖防線：檢查是否已解鎖 (執行過雲端還原)
+    // ==========================================
+    let isUnlocked = await localforage.getItem('ly_cloud_unlocked');
+    if (!isUnlocked) {
+        window.showAlert("⚠️ 系統保護機制：<br><br>偵測到您尚未進行首次雲端還原！<br>為避免本機新卦意外覆蓋掉雲端的舊紀錄，請先點選「📥 雲端還原」拉取舊資料，系統將為您自動比對合併！");
+        return;
+    }
+
+    let container = document.getElementById("rec-list-container");
+
+    if (container) {
+        container.innerHTML = `
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:60vh; background:rgba(0,0,0,0.5); border-radius:8px; animation: fadeIn 0.3s ease-in-out;">
+                <div class="taichi-spinner" style="font-size: 3.5rem; color: #fff; animation: taichi-spin 1.2s linear infinite; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">☯</div>
+                <div class="records-loader-text" style="margin-top: 15px; font-size: 1.1rem; font-weight: bold; color: #fff; letter-spacing: 2px; text-shadow: 0 1px 3px rgba(0,0,0,0.6);">上傳至雲端道域中...</div>
+            </div>
+        `;
+    }
+
+    // ★ BUG 修復：原先直接呼叫 uploadEverything 卻沒給資料，改為呼叫 syncToCloud(true)
+    if (typeof window.syncToCloud === 'function') {
+        await window.syncToCloud(true);
+    }
+
+    if (typeof window.showRecords === 'function') {
+        window.showRecords();
+    }
+};
+
+// ==========================================
+// ★ 複製加註：帶入預設 Checkbox 控制
+// ==========================================
+window.toggleDefaultAddon = function(isChecked) {
+    let caEl = document.getElementById("edit-copy-addon");
+    if (!caEl) return;
+    
+    if (isChecked) {
+        caEl.value = "請參照來源資料《六爻解卦標準流程》的步驟與規範詳細解釋此卦，並以問卦日期前輟生成解卦結果檔案。";
+    } else {
+        caEl.value = "";
+    }
+};

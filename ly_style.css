@@ -993,19 +993,22 @@ input[type="text"] {
     overflow: hidden;
 }
 
-/* 雙拼色印章專屬樣式 [左|右] */
-.dual-stamp {
-    display: inline-flex;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-left: 2px;
-    box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.2);
-    vertical-align: middle;
-    line-height: 1.2;
-    transform: scale(0.9);
-    transform-origin: left center;
-    flex-shrink: 0;
-}
+/* ★ 升級版：雙字陽刻小印章 (如：墓破、沖合) */
+    .yang-ke-seal {
+        display: inline-block !important; /* 取代 inline-flex，讓結構更緊湊 */
+        background: transparent !important; /* 透明底色 */
+        border: 1px solid #888 !important; /* 統一的精緻灰框線 */
+        padding: 0 2px !important; /* 極致壓縮左右留白，上下不留白 */
+        font-size: 0.75rem !important; /* 縮小字體符合印章比例 */
+        font-weight: bold !important;
+        border-radius: 3px !important;
+        line-height: 1.2 !important;
+        vertical-align: middle !important;
+        margin-left: 2px !important;
+        letter-spacing: 0 !important; /* 關鍵：強制字距歸零，讓兩個字完美貼合 */
+        box-shadow: 1px 1px 1px rgba(0,0,0,0.05) !important;
+        white-space: nowrap !important;
+    }
 
 .dual-stamp span {
     color: #fff;
@@ -1772,21 +1775,21 @@ details[open] .settings-summary::after {
         margin-top: 0px !important;
     }
 
-    /* ★ 黃金 8 欄分割法 (伏神寬裕版 + 干支最大化) */
-    .gua-table th:nth-child(1) { width: 9%; }
-    .gua-table th:nth-child(2) { width: 16%; }
-    .gua-table th:nth-child(3) { width: 9%; }
-    .gua-table th:nth-child(4) { width: 9%; }
-    .gua-table th:nth-child(5) { width: 16%; }
-    .gua-table th:nth-child(6) { width: 16%; }
-    .gua-table th:nth-child(7) { width: 16%; }
-    .gua-table th:nth-child(8) { width: 9%; }
+    /* ★ 全新對稱 8 欄分割法 (依據新順序最佳化寬度分配) */
+    .gua-table th:nth-child(1) { width: 9%; }  /* 1. 伏親 (文) */
+    .gua-table th:nth-child(2) { width: 16%; } /* 2. 伏神 (方) */
+    .gua-table th:nth-child(3) { width: 9%; }  /* 3. 六獸 (文) */
+    .gua-table th:nth-child(4) { width: 16%; } /* 4. 爻線 (線) */
+    .gua-table th:nth-child(5) { width: 9%; }  /* 5. 六親 (文) */
+    .gua-table th:nth-child(6) { width: 16%; } /* 6. 本卦干支 (方) */
+    .gua-table th:nth-child(7) { width: 9%; }  /* 7. 變親 (文) */
+    .gua-table th:nth-child(8) { width: 16%; } /* 8. 變卦干支 (方) */
 
-    /* ★ 針對六親、六獸的自適應縮小 */
+    /* ★ 針對文字欄位（伏親、六獸、六親、變親）的自適應縮小 */
     .gua-table td:nth-child(1),
-    .gua-table td:nth-child(2),
-    .gua-table td:nth-child(4),
-    .gua-table td:nth-child(8) {
+    .gua-table td:nth-child(3),
+    .gua-table td:nth-child(5),
+    .gua-table td:nth-child(7) {
         white-space: nowrap;
         min-width: 0;
         font-size: clamp(0.75rem, 3.5vw, 1rem) !important;
@@ -1794,21 +1797,37 @@ details[open] .settings-summary::after {
         text-overflow: ellipsis;
     }
 
-    /* ⬇️ 【修正 1】改回 Grid，讓第一欄 (爻線) 獨自置中，不受世應影響 */
     .ben-wrapper {
-        display: grid !important;
-        grid-template-columns: 1fr 14px 12px; /* 爻線佔滿剩餘空間(1fr)，世應和OX保留固定空間 */
+        display: flex !important;
+        flex-direction: column !important;
         align-items: center !important;
-        justify-items: center !important;
-        gap: 2px !important;
+        justify-content: center !important;
         width: 100% !important;
-        max-width: 100% !important;
-        overflow: hidden;
+        padding: 3px 0 !important;
+        box-sizing: border-box !important;
     }
 
-    .gua-table td:nth-child(3),
+    .ben-line-row {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        width: 100% !important;
+        height: 16px !important; /* 給予厚重爻線足夠的垂直呼吸空間 */
+    }
+
+    .ben-top {
+        display: grid;
+        grid-template-columns: 1fr 12px;
+        align-items: center;
+        justify-items: center;
+        width: 100%;
+        gap: 2px;
+    }
+
+    /* ★ 針對干支方塊欄位（伏神、本卦干支、變卦干支）的頂部對齊與防溢出 */
+    .gua-table td:nth-child(2),
     .gua-table td:nth-child(6),
-    .gua-table td:nth-child(7) {
+    .gua-table td:nth-child(8) {
         vertical-align: top !important;
         text-align: left !important;
         padding-top: 6px !important;
@@ -1871,13 +1890,12 @@ details[open] .settings-summary::after {
         font-size: 0.85rem;
     }
 
-    /* ⬇️ 【修正 2】爻線寬度改為 100%，由 Grid 的 1fr 來決定絕對置中 */
     .yao-bar {
         width: 100% !important;
-        max-width: 30px !important;
-        min-width: 16px !important;
-        height: 6px;
-        margin: 1px 0;
+        max-width: 34px !important; /* 凝聚中心點 */
+        min-width: 26px !important;
+        height: 9px !important;     /* ⚡ 爻線厚度從 6px 升級為 9px，極具分量！ */
+        border-radius: 1px !important; 
     }
 
     .y-s {
@@ -1889,29 +1907,10 @@ details[open] .settings-summary::after {
         justify-content: space-between !important;
     }
 
-    /* ⬇️ 【修正 4】斷線寬度改為百分比，保持爻線比例不變形 */
     .y-b span {
-        width: 42% !important;
-        height: 100%;
-        background: #000;
-    }
-
-    /* ⬇️ 【修正 5】微調世應與動變符號的佔位空間與彈性縮放 */
-    .sy-mark {
-        font-size: 0.8em !important;
-        color: #6f42c1;
-        font-weight: bold;
-        min-width: 12px !important;
-        text-align: center;
-        flex-shrink: 1; /* 允許在極端窄螢幕下微縮 */
-    }
-
-    /* 手機版：動爻 ○ / × 標籤 */
-    .move-mark {
-        font-size: 0.8em !important;
-        min-width: 12px !important;
-        text-align: center;
-        flex-shrink: 1; /* 允許在極端窄螢幕下微縮 */
+        width: 40% !important;
+        height: 100% !important;
+        background: #000 !important;
     }
 
     .fu-small {
@@ -2389,7 +2388,7 @@ details[open] .settings-summary::after {
 .nav-select-group { flex: 1 1 auto; display: flex; justify-content: center; gap: 2px; align-items: center; }
 .nav-mini-sel { font-size: 0.75em; padding: 2px 0px; max-width: 30vw; text-align: center; }
 .nav-btn-save { background: var(--red); color: white; border: none; border-radius: 4px; padding: 3px 10px; font-weight: bold; font-size: 0.85em; white-space: nowrap; cursor: pointer; }
-#res-gong-title { text-align: center; font-weight: bold; margin-top: 5px; margin-bottom: 10px; font-size: 1.1em; }
+#res-gong-title { text-align: center; font-weight: bold; margin-top: 5px; margin-bottom: 5px; font-size: 1.1em; }
 #score-detail-box { display: none; margin: 2px 10px; padding: 4px; background: #fff3cd; color: #856404; font-size: 0.75em; border-radius: 4px; text-align: center; box-shadow: inset 0 0 3px rgba(0,0,0,0.1); }
 
 /* 筆記與編輯區域 (Notes Section) */
@@ -2544,3 +2543,340 @@ details[open] .settings-summary::after {
     font-size: 1.1rem !important;
     background-color: rgba(255, 255, 255, 0.9);
 }
+
+/* 6. 世應專屬配色 (紫底紫框) */
+.sy-mark {
+    color: #6f42c1 !important;
+    background-color: #fafdff !important;
+    border: 1px solid #c2b4e2 !important;
+}
+
+/* 7. 動變 O/X 專屬配色 (紅底紅框) */
+.move-mark {
+    color: #dc3545 !important;
+    background-color: #fff5f5 !important; 
+    border: 1px solid #f5c2c7 !important; 
+}
+
+    /* 4. 下層：數據列（左世應，右 O/X） */
+.ben-meta-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important; 
+    gap: 3px !important; /* ★ 縮小間距，讓雙子星極致凝聚靠攏 */
+    width: 100% !important;
+    margin-top: 4px !important;
+    height: 18px !important;
+    box-sizing: border-box !important;
+}
+
+/* 5. 雙子星共用基礎 (★ 改用 Flex 達到絕對置中，拔除 padding 干擾) */
+.sy-mark, .move-mark {
+    display: flex !important;
+    justify-content: center !important; /* 水平絕對置中 */
+    align-items: center !important;     /* 垂直絕對置中 */
+    width: 22px !important;  /* 寬度稍微收緊，看起來更像正方形小印章 */
+    height: 17px !important; /* 強制等高 */
+    font-size: 0.72rem !important;
+    font-weight: bold !important;
+    border-radius: 3px !important;
+    box-sizing: border-box !important;
+    padding: 0 !important; /* 拔除 padding */
+    margin: 0 !important;
+    /* ★ 強制使用系統預設的無襯線英文字型，消除中文字體的內建空白偏移 */
+    font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important; 
+    letter-spacing: 0 !important;
+}
+
+/* ★ 完美的雙色各半「陰刻」印章 (尺寸與普通印章 100% 相同) */
+.perfect-yinke-seal {
+    display: inline-flex !important;
+    border-radius: 3px !important;
+    border: 1px solid #888 !important;    /* 統一的印章外框 */
+    overflow: hidden !important;          /* 關鍵：讓內部的色塊完美貼合圓角外框 */
+    vertical-align: middle !important;
+    margin-left: 2px !important;
+    box-shadow: 1px 1px 1px rgba(0,0,0,0.05) !important;
+    white-space: nowrap !important;
+}
+
+/* 內部兩個字的共用設定 */
+.perfect-yinke-seal span {
+    color: #ffffff !important;            /* 陰刻：字體一律反白 */
+    font-size: 0.75rem !important;
+    font-weight: bold !important;
+    line-height: 1.2 !important;
+    display: inline-block !important; 
+}
+
+/* 關鍵魔法：將 Padding 精準切半分配，維持與標準印章一樣的呼吸空間 */
+.perfect-yinke-seal span:first-child {
+    padding: 1px 1.5px 1px 3px !important; /* 左邊字：左側正常留白，右側極限靠攏 */
+}
+.perfect-yinke-seal span:last-child {
+    padding: 1px 3px 1px 1.5px !important; /* 右邊字：右側正常留白，左側極限靠攏 */
+}
+
+/* ★ 修正 1：鎖死所有印章的絕對尺寸，不受手機系統字體放大干擾 */
+    .mark-break, .perfect-seal, .perfect-yinke-seal, .glass-stamp {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        height: 18px !important;    /* 鎖死絕對高度 */
+        min-width: 32px !important; /* 鎖死絕對寬度 */
+        box-sizing: border-box !important;
+        font-size: 11px !important; /* 放棄 rem/em，使用絕對 px */
+        line-height: 1 !important;
+        padding: 0 2px !important;
+        overflow: hidden !important;
+        vertical-align: middle !important;
+        white-space: nowrap !important;
+    }
+
+    /* 雙拼陰刻膠囊專屬內部佈局 */
+    .perfect-yinke-seal span {
+        flex: 1 !important;
+        height: 100% !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0 !important;
+    }
+
+/* ===================================================
+       ★ 歷史紀錄專屬：半透明太極載入動畫
+       =================================================== */
+    .records-loader-overlay {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        /* 設定一個最小高度，讓動畫能撐開空間並居中 */
+        min-height: 60vh; 
+        background-color: rgba(0, 0, 0, 0.5); /* 半透明暗色背景 */
+        border-radius: 8px; /* 配合你原本卡片的圓角質感 */
+        animation: fadeIn 0.3s ease-in-out;
+    }
+    
+    .taichi-spinner {
+        font-size: 3.5rem;
+        color: #fff; 
+        animation: taichi-spin 1.2s linear infinite;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); /* 讓太極在暗底上微發光 */
+    }
+    
+    .records-loader-text {
+        margin-top: 15px;
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #fff;
+        letter-spacing: 2px;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    }
+    
+    @keyframes taichi-spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+/* ★ 修正 2：電腦版爻線強制塑形，保證絕對不會被擠壓變形 */
+.yao-visual {
+    width: 60px;          /* 確保爻線有固定寬度 */
+    height: 12px;         /* 確保爻線有固定厚度 */
+    display: inline-block;
+    vertical-align: middle;
+    margin: 0 10px;
+}
+
+.y-solid {
+    width: 100%;
+    height: 100%;
+    background-color: #333; /* 陽爻：填滿黑線 */
+    border-radius: 1px;
+}
+
+.y-broken {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between; /* 將兩個 span 推向左右兩邊 */
+    width: 100%;
+    height: 100%;
+}
+
+.y-broken span {
+    width: 42%;             /* 兩邊粗線各佔 42%，中間自動空出 16% */
+    height: 100%;
+    background-color: #333; /* 陰爻段落 */
+    display: block;
+    border-radius: 1px;
+}
+
+/* ==========================================
+   ★ 核心標籤升級：世、應、○、✕ 同步放大粗體與特色徽章
+========================================== */
+
+/* 1. 統一放寬手機版數據列高度限制，給予大徽章完美的上下呼吸空間 */
+.ben-meta-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important; 
+    gap: 5px !important; 
+    width: 100% !important;
+    margin-top: 4px !important;
+    height: 28px !important; /* 從 18px 拓寬至 28px */
+    box-sizing: border-box !important;
+}
+
+/* 2. 核心徽章通用骨架（鎖定絕對長寬，不因系統字體放大而變形） */
+.ly-core-badge {
+    display: inline-flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    font-size: 1.15rem !important;  /* 同步放大字體 */
+    font-weight: 900 !important;     /* 極粗體 */
+    width: 25px !important;          /* 寬度增大 */
+    height: 24px !important;         /* 高度增大 */
+    box-sizing: border-box !important;
+    line-height: 1 !important;
+    margin: 0 2px !important;
+    vertical-align: middle !important;
+    box-shadow: 1px 2px 4px rgba(0,0,0,0.2) !important; /* 精緻立體陰影 */
+    letter-spacing: 0 !important;
+    border-collapse: separate !important;
+}
+
+/* 世爻：朱砂正方印（象徵主體、大印、穩固如山） */
+.badge-shi {
+    background-color: #b22222 !important; /* 典雅深硃砂紅 */
+    color: #ffffff !important;
+    border: 1px solid #8b0000 !important;
+    border-radius: 2px !important;        /* 剛直正方形 */
+}
+
+/* 應爻：玄青膠囊印（象徵客體、環境、交錯圓融） */
+.badge-ying {
+    background-color: #1a365d !important; /* 沉穩玄青藍 */
+    color: #ffffff !important;
+    border: 1px solid #0f2340 !important;
+    border-radius: 7px !important;        /* 流線圓角矩形 */
+}
+
+/* ○ 老陽：明曜乾元圈（象徵陽動、過去、圓滿發散） */
+.badge-old-yang {
+    background-color: #ff9f43 !important; /* 活力金燦陽光橙 */
+    color: #ffffff !important;
+    border: 1px solid #ee5a24 !important;
+    border-radius: 50% !important;        /* 完美正圓形，呼應 ○ */
+    font-family: sans-serif !important;    /* 確保幾何符號完美居中 */
+}
+
+/* ✕ 老陰：神祕雙線方（象徵陰動、未來、交錯收斂） */
+.badge-old-yin {
+    background-color: #6f42c1 !important;  /* 神祕皇家紫 */
+    color: #ffffff !important;
+    border: 2px double #ffffff !important; /* 雙層反白圈線，辨識度拉滿 */
+    border-radius: 4px !important;         /* 微弧四方形 */
+    font-family: sans-serif !important;
+}
+
+/* 覆蓋並淨化手機版舊有的細外框設定 */
+.ben-meta-row .sy-mark, 
+.ben-meta-row .move-mark {
+    border: none !important;
+    background: transparent !important;
+    width: auto !important;
+    height: auto !important;
+}
+
+/* ==========================================
+   ★ 確保尋找應期抽屜與萬年曆同層級
+========================================== */
+#yingqi-drawer-panel,
+#calendar-sheet-panel {
+    z-index: 1050 !important;
+}
+
+/* ==========================================
+   ★ 確保 SVG 畫線層級與抽屜層級正確
+========================================== */
+/* 讓畫線畫布退居幕後，且不阻擋滑鼠點擊穿透 */
+#rel-svg {
+    z-index: 10 !important;
+    pointer-events: none !important; 
+}
+
+/* 確保所有側拉抽屜與日曆永遠在最上層 */
+#yingqi-drawer-panel,
+#records-drawer-panel,
+#calendar-sheet-panel {
+    z-index: 9999 !important;
+}
+
+/* ==========================================
+   ★ 應期面板：干支選單字體放大
+========================================== */
+.yq-sel {
+    font-size: 1.15rem !important; /* 加大干支字體 */
+    padding: 6px !important;
+}
+
+/* ==========================================
+   ★ 究極雙軌濾鏡樣式：全域深色模式 ＆ 互補白底回收桶
+========================================== */
+/* 1. 基礎設定：防止多餘橫向捲軸 */
+html {
+    overflow-x: hidden !important;
+}
+
+/* 2. 深色模式主體 (掛在 html 避免 fixed 失效) */
+html.global-dark-mode {
+    filter: invert(0.92) hue-rotate(180deg);
+    background-color: #111 !important;
+    max-width: 100vw !important;
+    min-height: 100vh !important; 
+}
+
+/* ★ 統一回收桶視覺：強制脫離濾鏡，並設定中性灰 */
+html.recycle-bin-preview-mode {
+    filter: none !important; /* 強制切斷濾鏡影響 */
+    background-color: #bababa !important; /* 統一為淺灰色 (Neutral Light Gray) */
+}
+
+/* 確保回收桶內的文字和 UI 也跟隨淺灰色背景 */
+html.recycle-bin-preview-mode #result-view,
+html.recycle-bin-preview-mode .ly-modal-overlay {
+    background-color: #bababa !important;
+    color: #333 !important;
+}
+
+/* 5. 二次反轉保護 (防止彈窗、Toast、設定視窗被反色) 
+   包含「深色模式」以及「白色模式下的回收桶」 */
+html.global-dark-mode #toast-container,
+html.global-dark-mode .ly-modal-overlay,
+html.global-dark-mode #settings-modal,
+html.global-dark-mode #ly-history-panel,
+html.recycle-bin-preview-mode:not(.global-dark-mode) #toast-container,
+html.recycle-bin-preview-mode:not(.global-dark-mode) .ly-modal-overlay,
+html.recycle-bin-preview-mode:not(.global-dark-mode) #settings-modal,
+html.recycle-bin-preview-mode:not(.global-dark-mode) #ly-history-panel {
+    filter: invert(1) hue-rotate(180deg) !important;
+}
+
+/* 6. 強制深色模式下的開場動畫，絕對對齊「螢幕視窗(vw/vh)」 */
+html.global-dark-mode #ly-splash-screen {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    /*width: 100vw !important;
+    height: 100vh !important;*/
+}
+
+.ly-switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+.ly-switch input { opacity: 0; width: 0; height: 0; }
+.ly-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
+.ly-slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+input:checked + .ly-slider { background-color: #0d6efd; }
+input:checked + .ly-slider:before { transform: translateX(20px); }

@@ -1,3 +1,8 @@
+// ★ 抽象同構設定：八字四柱的視覺排列方向
+// 'rtl' (Right-to-Left): 年在最右，視覺上為 [時] [日] [月] [年] (日左月右) - 目前系統預設
+// 'ltr' (Left-to-Right): 年在最左，視覺上為 [年] [月] [日] [時] (月左日右)
+window.baziLayoutOrder = 'rtl';
+
 // 初始化應用程式
 // ==========================================
 // ★ 全域常駐狀態同步器 (讓首頁與設定視窗的狀態保持一致)
@@ -7,9 +12,9 @@ window.syncStatusMsg = function (timeMsg, locMsg) {
     let pMsg = document.getElementById("portal-msg");
     let mMsg = document.getElementById("modal-msg");
 
-    // 同時更新首頁與彈出視窗的文字，並且拔除 setTimeout 讓它永久常駐
-    if (pMsg) pMsg.innerText = msg;
-    if (mMsg) mMsg.innerText = msg;
+    // ★ 修正：從 innerText 改為 innerHTML，支援紅字標籤渲染
+    if (pMsg) pMsg.innerHTML = msg;
+    if (mMsg) mMsg.innerHTML = msg;
 };
 
 // ★ 新增：全域的南半球選項同步函數
@@ -30,6 +35,35 @@ window.syncSouthAdjust = async function (isChecked) {
     window.animCfg.southAdjust = isChecked;
     if (typeof localforage !== 'undefined') {
         await localforage.setItem('ly_animCfg', window.animCfg);
+    }
+};
+
+// ★ 全全新功能：全域深色模式控制與記憶引擎
+window.toggleGlobalDarkMode = async function (isChecked) {
+    // 1. 同步切換 CSS Class (★ 關鍵：改為綁定在 html 根元素上)
+    if (isChecked) {
+        document.documentElement.classList.add("global-dark-mode");
+    } else {
+        document.documentElement.classList.remove("global-dark-mode");
+    }
+
+    // 2. 同步設定 Checkbox
+    let cb = document.getElementById("set-global-dark-mode");
+    if (cb) cb.checked = isChecked;
+
+    // 3. 更新 localStorage (為了開場動畫防閃爍)
+    localStorage.setItem("ly_early_dark_mode", isChecked ? "true" : "false");
+
+    // 4. 儲存設定至 localforage (維持一致性)
+    if (!window.animCfg) window.animCfg = {};
+    window.animCfg.globalDarkMode = isChecked;
+
+    if (typeof localforage !== 'undefined') {
+        try {
+            await localforage.setItem('ly_animCfg', window.animCfg);
+        } catch (e) {
+            console.error("儲存深色模式設定失敗:", e);
+        }
     }
 };
 
@@ -68,10 +102,10 @@ async function initApp() {
                 
                 <select id="yao-sel-${i}" class="yao-select-centered" style="width:100%; padding:5px 0; font-size:0.85rem; font-family:monospace;" onchange="updateYaoSeal(${i})">
                     <option value="">-選擇-</option>
-                    <option value="少陽">少陽━━━</option>
-                    <option value="老陽">老陽━━━O</option>
+                    <option value="少陽">少陽━━</option>
+                    <option value="老陽">老陽━━◯</option>
                     <option value="少陰">少陰━ ━</option>
-                    <option value="老陰">老陰━ ━X</option>
+                    <option value="老陰">老陰━ ━✕</option>
                 </select>
                 
                 <div style="display:flex; justify-content:center;">
@@ -125,48 +159,133 @@ async function initApp() {
             splash.style.display = 'none';
         }, 400);
     }
+
+    // ★ 載入網頁時，自動去 localforage 讀取並還原使用者的深色模式設定
+    if (typeof localforage !== 'undefined') {
+        let savedCfg = await localforage.getItem('ly_animCfg');
+        let isDark = true; // 系統預設值
+
+        // 判斷使用者的儲存狀態
+        if (savedCfg && savedCfg.globalDarkMode !== undefined) {
+            isDark = savedCfg.globalDarkMode;
+        } else {
+            let earlyDark = localStorage.getItem("ly_early_dark_mode");
+            if (earlyDark === "false") isDark = false;
+        }
+
+        // ★ 核心修復：不論是 True 還是 False，都強制呼叫 toggleGlobalDarkMode
+        // 這樣就能保證畫面樣式與 Checkbox 的打勾狀態 100% 同步！
+        window.toggleGlobalDarkMode(isDark);
+    }
+    // ... (上方是原本深色模式的讀取邏輯)
+    if (typeof localforage !== 'undefined') {
+        let savedCfg = await localforage.getItem('ly_animCfg');
+        let isDark = true; // 系統預設值
+
+        if (savedCfg && savedCfg.globalDarkMode !== undefined) {
+            isDark = savedCfg.globalDarkMode;
+        } else {
+            let earlyDark = localStorage.getItem("ly_early_dark_mode");
+            if (earlyDark === "false") isDark = false;
+        }
+
+        window.toggleGlobalDarkMode(isDark);
+    }
+
+    // ==========================================
+    // ★ 新增：APP 載入完成後，自動觸發「帶入時位」
+    // ==========================================
+    setTimeout(() => {
+        if (typeof autoLocateCity === 'function') {
+            autoLocateCity();
+        }
+    }, 800);
 }
 
 window.onload = initApp;
 
-// ★★★ 修改：將起卦與重新計算整合，並儲存下拉選單狀態 ★★★
 function process(ls, method, preserveNotes = null) {
+    document.documentElement.classList.remove('recycle-bin-preview-mode');
     AppState.curRecIndex = -1;
-    let bazi, timeNote = "", jieQiInfo = null, dateObj = null;
+    let bazi,
+        timeNote = "",
+        jieQiInfo = null,
+        dateObj = null;
     let useCustomTime = true;
     let isSouthAdjust = false;
 
     if (window.tempEditSouthAdjust !== undefined) {
         isSouthAdjust = window.tempEditSouthAdjust;
-    } else if ($("cb-south-adjust") && $("south-adjust-wrapper").style.display !== "none") {
+    } else if (
+        $("cb-south-adjust") &&
+        $("south-adjust-wrapper").style.display !== "none"
+    ) {
         isSouthAdjust = $("cb-south-adjust").checked;
-    } else if ($("modal-cb-south-adjust") && $("modal-south-adjust-wrapper").style.display !== "none") {
+    } else if (
+        $("modal-cb-south-adjust") &&
+        $("modal-south-adjust-wrapper").style.display !== "none"
+    ) {
         isSouthAdjust = $("modal-cb-south-adjust").checked;
     } else {
-        isSouthAdjust = window.animCfg ? (window.animCfg.southAdjust || false) : false;
+        isSouthAdjust = window.animCfg
+            ? window.animCfg.southAdjust || false
+            : false;
     }
 
     if (useCustomTime) {
         if (AppState.isTrueMode) {
-            let y = parseInt($("ts-year").value), m = parseInt($("ts-month").value), d = parseInt($("ts-day").value);
-            let h = parseInt($("ts-hour").value), min = parseInt($("ts-minute").value);
+            let y = parseInt($("ts-year").value),
+                m = parseInt($("ts-month").value),
+                d = parseInt($("ts-day").value);
+            let h = parseInt($("ts-hour").value),
+                min = parseInt($("ts-minute").value);
+
             dateObj = new Date(y, m, d, h, min);
             let lon = parseFloat($("ts-lon").value);
-            let realD = new Date(dateObj.getTime() + (lon - 120) * 4 * 60000);
-            let diff = (realD - dateObj) / 60000;
-            timeNote = `(真太陽時: ${diff > 0 ? '+' : ''}${diff.toFixed(1)}分)`;
+
+            // ==========================================
+            // ★ 究極真太陽時運算：經度平太陽時 + 均時差
+            // ==========================================
+            // 1. 計算當天是一年中的第幾天 (Day of Year)
+            let startOfYear = new Date(y, 0, 0);
+            let diffTime = dateObj.getTime() - startOfYear.getTime();
+            let dayOfYear = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            // 2. 均時差簡化逼近公式 (結果為分鐘)
+            let b = (2 * Math.PI * (dayOfYear - 81)) / 365;
+            let eot = 9.87 * Math.sin(2 * b) - 7.53 * Math.cos(b) - 1.5 * Math.sin(b);
+            // 3. 經度時差 (以中原標準時間 UTC+8 的 120 度為基準，每度 4 分鐘)
+            let lonDiff = (lon - 120) * 4;
+            // 4. 總時差 = 經度時差 + 均時差
+            let totalDiff = lonDiff + eot;
+            // 5. 算出最終真正的「真太陽時」
+            let realD = new Date(dateObj.getTime() + totalDiff * 60000);
+            // 記錄修正了多少分鐘供畫面顯示
+            timeNote = `(真太陽時: ${totalDiff > 0 ? "+" : ""}${totalDiff.toFixed(1)}分)`;
             bazi = getBazi(realD, isSouthAdjust);
         } else {
-            let yg = Gan[parseInt($("gz-y-gan").value)], yz = Zhi[parseInt($("gz-y-zhi").value)];
-            let mg = Gan[parseInt($("gz-m-gan").value)], mz = Zhi[parseInt($("gz-m-zhi").value)];
-            let dg = Gan[parseInt($("gz-d-gan").value)], dz = Zhi[parseInt($("gz-d-zhi").value)];
-            let hg = Gan[parseInt($("gz-h-gan").value)], hz = Zhi[parseInt($("gz-h-zhi").value)];
-            bazi = { Y: yg + yz, M: mg + mz, D: dg + dz, H: hg + hz, dG: parseInt($("gz-d-gan").value), dZ: parseInt($("gz-d-zhi").value), mZ: parseInt($("gz-m-zhi").value) };
+            let yg = Gan[parseInt($("gz-y-gan").value)],
+                yz = Zhi[parseInt($("gz-y-zhi").value)];
+            let mg = Gan[parseInt($("gz-m-gan").value)],
+                mz = Zhi[parseInt($("gz-m-zhi").value)];
+            let dg = Gan[parseInt($("gz-d-gan").value)],
+                dz = Zhi[parseInt($("gz-d-zhi").value)];
+            let hg = Gan[parseInt($("gz-h-gan").value)],
+                hz = Zhi[parseInt($("gz-h-zhi").value)];
+            bazi = {
+                Y: yg + yz,
+                M: mg + mz,
+                D: dg + dz,
+                H: hg + hz,
+                dG: parseInt($("gz-d-gan").value),
+                dZ: parseInt($("gz-d-zhi").value),
+                mZ: parseInt($("gz-m-zhi").value),
+            };
             timeNote = "(自訂干支)";
             dateObj = new Date();
         }
     } else {
-        dateObj = new Date(); bazi = getBazi(dateObj);
+        dateObj = new Date();
+        bazi = getBazi(dateObj);
         bazi = getBazi(dateObj, isSouthAdjust);
     }
 
@@ -185,62 +304,126 @@ function process(ls, method, preserveNotes = null) {
         najiaValue: najia,
         fushenValue: fushen,
         bianViewValue: bianView,
+        isDrawModeEnabled: false, // ★ 解決問題3：每支新卦預設關閉繪圖，確保狀態獨立
         method,
-        dateStr: (useCustomTime && !AppState.isTrueMode) ? "自訂時間" : fmtDate(dateObj),
-        solarNote: timeNote, jieQiInfo,
+        dateStr:
+            useCustomTime && !AppState.isTrueMode ? "自訂時間" : fmtDate(dateObj),
+        solarNote: timeNote,
+        jieQiInfo,
         gender: document.querySelector('input[name="gender"]:checked').value,
         najia: $("set-najia").options[$("set-najia").selectedIndex].text,
         fushen: $("set-fushen").options[$("set-fushen").selectedIndex].text,
         showCi: $("set-show-ci").value === "1",
         question: $("p-question").value,
-        subject: (preserveNotes && preserveNotes.subject) ? preserveNotes.subject : "", // ★ 補上這行
-        judge: (preserveNotes && preserveNotes.judge) ? preserveNotes.judge : "",
-        feedback: (preserveNotes && preserveNotes.feedback) ? preserveNotes.feedback : "",
-        note: (preserveNotes && preserveNotes.note) ? preserveNotes.note : "",
-        history: (preserveNotes && preserveNotes.history) ? preserveNotes.history : []
+        subject:
+            preserveNotes && preserveNotes.subject ? preserveNotes.subject : "",
+        judge: preserveNotes && preserveNotes.judge ? preserveNotes.judge : "",
+        feedback:
+            preserveNotes && preserveNotes.feedback ? preserveNotes.feedback : "",
+        note: preserveNotes && preserveNotes.note ? preserveNotes.note : "",
+        currentStatus: preserveNotes && preserveNotes.currentStatus ? preserveNotes.currentStatus : "", // ★ 新增
+        copyAddon: preserveNotes && preserveNotes.copyAddon !== undefined ? preserveNotes.copyAddon : "請參照來源資料《六爻解卦標準流程》的步驟與規範詳細解卦，並以問卦日期前輟生成解卦結果檔案。", // ★ 新增
+        history:
+            preserveNotes && preserveNotes.history ? preserveNotes.history : [],
     };
+
+    // ★ 全域繪圖狀態同步歸零
+    AppState.isDrawModeEnabled = false;
 
     $("res-set-najia").value = najia;
     $("res-set-fushen").value = fushen;
     $("res-set-bian").value = bianView;
 
-    // ★ 修復核心：移除 pushState，標記非紀錄進入，並交給 Hash Router 處理畫面
     window.comesFromRecords = false;
     window.hasUnsavedChanges = true;
     window.location.hash = "#result";
 
     renderRes();
+
+    // ==========================================
+    // ★ 解決問題1：起卦完畢，立刻強制背景存檔 (Auto-Save)
+    // ==========================================
+    setTimeout(async () => {
+        if (AppState.curRecIndex === -1 || AppState.curRecIndex === undefined) {
+            let recs = (await localforage.getItem("iching_final_v60")) || [];
+            let cloneData = JSON.parse(JSON.stringify(AppState.curData));
+            recs.unshift(cloneData); // 存入最新一筆
+            AppState.curRecIndex = 0; // 鎖定當前索引
+            await localforage.setItem("iching_final_v60", recs);
+
+            // 標記為已存檔，解除返回攔截警告
+            window.hasUnsavedChanges = false;
+            window.comesFromRecords = true;
+
+            // 若雲端自動同步開啟，順便上傳
+            if (typeof window.syncToCloud === "function") window.syncToCloud();
+        }
+    }, 100); // 給予 0.1 秒緩衝，讓畫面先順暢渲染
+    // ★ 新增這行：排盤完成後，將自訂時間鎖解除，讓下一次起卦能再次自動抓最新時間！
+    window.isCustomTimeSet = false;
 }
 
-function startManual() {
+// ==========================================
+// ★ 核心時間同步器 (起卦瞬間抓取最新時間)
+// ==========================================
+window.isCustomTimeSet = false; // 全域標記：使用者是否有自訂時間
+
+function refreshTimeToNow() {
+    // 智慧防呆：如果使用者有進去「自訂時位」修改過時間，就尊重他的設定，絕對不自動覆蓋
+    if (window.isCustomTimeSet) return;
+
+    let d = new Date();
+    let yEl = document.getElementById("ts-year");
+    if (yEl) {
+        yEl.value = d.getFullYear();
+        document.getElementById("ts-month").value = d.getMonth();
+        document.getElementById("ts-day").value = d.getDate();
+        document.getElementById("ts-hour").value = d.getHours();
+        document.getElementById("ts-minute").value = d.getMinutes();
+    }
+}
+
+// ★ 新增 customMethod 參數
+function startManual(customMethod) {
+    document.documentElement.classList.remove('recycle-bin-preview-mode');
+    window.comesFromRecords = false;
+
+    refreshTimeToNow();
+
     let ls = [];
-    // 定義中文對應的爻象數值 (7:少陽, 9:老陽, 8:少陰, 6:老陰)
     const valMap = { "少陽": 7, "老陽": 9, "少陰": 8, "老陰": 6 };
 
     for (let i = 0; i < 6; i++) {
         let sel = document.getElementById("yao-sel-" + i);
         if (!sel || !sel.value) {
             if (window.showAlert) window.showAlert(`請確認【${['初爻', '二爻', '三爻', '四爻', '五爻', '上爻'][i]}】已選擇爻象！`);
-            return; // 防呆：如果沒選完就阻擋執行
+            return;
         }
         ls.push(valMap[sel.value]);
     }
-    process(ls, "M 手動起卦");
+
+    // ★ 判斷：如果有傳入自訂標示，就用自訂的，否則預設為手動起卦
+    let methodStr = (typeof customMethod === 'string') ? customMethod : "M 手動起卦";
+    process(ls, methodStr);
+
     resetManualUI();
 }
 
 function startAuto() {
-    // ★ 微創 1：防呆檢查
+    document.documentElement.classList.remove('recycle-bin-preview-mode');
+    window.comesFromRecords = false;
+
     let hasManualInput = false;
     for (let i = 0; i < 6; i++) {
         let sel = document.getElementById("yao-sel-" + i);
         if (sel && sel.value !== "") hasManualInput = true;
     }
-    // 如果起爻進度大於 0，也算是有手動輸入
     if (window.AppState && window.AppState.currentCastStep > 0) hasManualInput = true;
 
-    // 定義原本的核心運算
     const executeAuto = () => {
+        // ★ 核心新增：點下去的瞬間，重新定時！
+        refreshTimeToNow();
+
         let ls = [];
         for (let i = 0; i < 6; i++) {
             let c = 0;
@@ -252,17 +435,15 @@ function startAuto() {
         process(ls, "A 電腦起卦");
     };
 
-    // ★ 微創 2：如果發現有手動痕跡，跳出詢問
     if (hasManualInput) {
         window.showConfirm("⚠️ 警告：目前卦盤已有手動起卦進度。\n\n確定要放棄當前輸入，改由電腦重新起卦嗎？\n(此動作將清空目前的盤面)").then(ok => {
             if (ok) {
-                // 術後清空：呼叫你寫好的清空 UI 函數
                 if (typeof window.resetManualUI === 'function') window.resetManualUI();
                 executeAuto();
             }
         });
     } else {
-        executeAuto(); // 盤面乾淨，直接起卦
+        executeAuto();
     }
 }
 
@@ -270,9 +451,19 @@ function startAuto() {
 // ★ 系統設定與自動定位模組
 // ==========================================
 let animCfg = {
-    tmPrep: 2.0, tmToss: 1.0, tmSy: 1.0, tmOy: 1.0, tmSn: 1.0, tmOn: 1.0,
-    useShake: false, endMode: 'click', endTime: 0.3,
-    tossMode: 'video'
+    tmPrep: 1.5, tmToss: 2.0, tmSy: 1.5, tmOy: 2.0, tmSn: 1.5, tmOn: 2.0,
+    useShake: false,
+    endMode: 'click',
+    endTime: 2.0,
+    tossMode: 'qianlong',
+    tossTrigger: 'press',
+    southAdjust: false,
+
+    // ★ 龜殼預設四大金剛
+    turtleSpeed: 1,           // 速度預設為最穩重的 1
+    turtleMoveSpeed: true,    // 預設開啟按移變速
+    turtleVibrate: true,      // 預設開啟震動
+    turtleAutoNext: true      // 預設開啟連續免點擊
 };
 
 let msgTimer = null; // 放在全域避免多次點擊計時器重疊
@@ -327,17 +518,6 @@ function findCountyByOfflineMap(lon, lat, geojsonData) {
     }
     return "other";
 }
-
-// ==========================================
-// ★ 全域常駐狀態同步器
-// ==========================================
-window.syncStatusMsg = function (timeMsg, locMsg) {
-    let msg = `${timeMsg} ｜ ${locMsg}`;
-    let pMsg = document.getElementById("portal-msg");
-    let mMsg = document.getElementById("modal-msg");
-    if (pMsg) pMsg.innerText = msg;
-    if (mMsg) mMsg.innerText = msg;
-};
 
 // ==========================================
 // ★ 究極七軌制定位引擎 (加入防連點鎖 & GPS 硬體快取)
@@ -606,9 +786,22 @@ function getJieQiRange(d) {
     return { prev: terms[idx - 1], next: terms[idx] };
 }
 function fmtDate(d) {
-    if (typeof d === 'string') d = new Date(d);
-    let m = d.getMonth() + 1, dd = d.getDate(), h = d.getHours(), mm = d.getMinutes();
-    return `${d.getFullYear()}/${m}/${dd} ${h < 10 ? '0' + h : h}:${mm < 10 ? '0' + mm : mm}`;
+    // 1. 防呆：如果是空值直接回傳空字串
+    if (!d) return "";
+
+    // 2. 強制轉換：無論 d 是字串、數字時間戳，還是已經是 Date 物件，一律轉為正規 Date
+    let dateObj = (d instanceof Date) ? d : new Date(d);
+
+    // 3. 防呆：如果轉換後是無效日期 (Invalid Date)，回傳空字串
+    if (isNaN(dateObj.getTime())) return "";
+
+    // 4. 安全地抓取時間參數
+    let m = dateObj.getMonth() + 1;
+    let dd = dateObj.getDate();
+    let h = dateObj.getHours();
+    let mm = dateObj.getMinutes();
+
+    return `${dateObj.getFullYear()}/${m}/${dd} ${h < 10 ? '0' + h : h}:${mm < 10 ? '0' + mm : mm}`;
 }
 
 function getSolarTerm(y, n) {
@@ -781,12 +974,15 @@ function solve(lines, bazi, najiaMode, fushenMode) {
         let k1 = (10 - bazi.dG + bazi.dZ) % 12; if (k1 < 0) k1 += 12;
         let k2 = (11 - bazi.dG + bazi.dZ) % 12; if (k2 < 0) k2 += 12;
 
-        if (targetZ === k1 || targetZ === k2) s += '<span class="mark-kong">空</span>';
+        // 1. 空亡
+        if (targetZ === k1 || targetZ === k2) s += '<span class="mark-break">空亡</span>';
 
+        // 2. 月破
+        if (Math.abs(targetZ - bazi.mZ) === 6) s += '<span class="mark-break" style="background-color:#dc3545; box-shadow: 1px 1px 2px rgba(0,0,0,0.2);">月破</span>';
+
+        // 3. 日沖 (嚴格只有日沖)
         let isDChong = Math.abs(targetZ - bazi.dZ) === 6;
-
-        if (isDChong) s += '<span class="mark-break" style="background:#6f42c1;">日沖</span>';
-        if (Math.abs(targetZ - bazi.mZ) === 6) s += '<span class="mark-break">月破</span>';
+        if (isDChong) s += '<span class="mark-break" style="background-color:#6f42c1; box-shadow: 1px 1px 2px rgba(0,0,0,0.2);">日沖</span>';
 
         return { html: s, isAD: false, isDPo: isDChong };
     };
@@ -801,6 +997,8 @@ function solve(lines, bazi, najiaMode, fushenMode) {
         let fGZ = fuLines[i].gz, fZhiIdx = Zhi.indexOf(fGZ.slice(1, 2));
         const getTombZhi = (elIdx) => ({ 0: 1, 1: 7, 2: 4, 3: 10, 4: null }[elIdx]);
 
+        let isMoving = (lines[i] === 6 || lines[i] === 9);
+
         // 算出出伏狀態 (給大眾版或外掛套件參考用)
         let isFuOut = false;
         if (fGZ) {
@@ -809,10 +1007,14 @@ function solve(lines, bazi, najiaMode, fushenMode) {
                 (Math.abs(bazi.dZ - zFeiIdx) === 6 || (bazi.dZ + zFeiIdx) % 12 === 1) ||
                 ((bazi.dZ === getTombZhi(ZhiFiveMap[zFeiIdx])) && (zFeiIdx !== bazi.dZ)) ||
                 (zFeiIdx === ((10 - bazi.dG + bazi.dZ) % 12 + (zFeiIdx < 0 ? 12 : 0)) || zFeiIdx === ((11 - bazi.dG + bazi.dZ) % 12 + (zFeiIdx < 0 ? 12 : 0)));
+
+            // ★ 新增修正：當飛神（本爻）為動爻時，伏神絕對無法出伏
+            if (isMoving) {
+                isFuOut = false;
+            }
         }
 
         let fuIsHidden = (fushenMode === "wang" && presentRels.has(fuLines[i].rel));
-        let isMoving = (lines[i] === 6 || lines[i] === 9);
 
         let fuStatusHtml = "", myStatus = { html: "", isAD: false, isDPo: false }, bStatusObj = { html: "" }, score = 0;
 
@@ -828,14 +1030,13 @@ function solve(lines, bazi, najiaMode, fushenMode) {
             bStatusObj = { html: advInfo.bstatusHtml };
             fuStatusHtml = advInfo.fuStatusHtml;
         } else {
-            // 簡易處理
-            let fBasic = basicMk(fZhiIdx);
-            fuStatusHtml = fBasic.html;
-            if (isFuOut) fuStatusHtml += `<span style="background:#28a745; color:#fff; padding:1px 3px; border-radius:2px; font-size:0.75em; margin-left:4px; font-weight:normal; box-shadow: 1px 1px 2px rgba(0,0,0,0.2);">出伏</span>`;
-
+            // 完全由 ly_engine.js 獨立處理基礎印章
             myStatus = basicMk(z);
-            if (isMoving) {
+            if (isMoving && zB !== undefined) {
                 bStatusObj = basicMk(zB);
+            }
+            if (fGZ && !fuIsHidden) {
+                fuStatusHtml = basicMk(fZhiIdx).html;
             }
         }
 
@@ -858,16 +1059,29 @@ function solve(lines, bazi, najiaMode, fushenMode) {
     return { ben, bian, rows, bazi };
 }
 
-// ★ 升級版：支援雙向同步的設定更新函式
+// ★ 升級版：支援雙向同步與繪圖快照重置的設定更新函式
 window.applyResultSettings = function (source = 'nav') {
+    // ==========================================
+    // ★ 核心修復：在變更設定與重繪大表前，先將畫面上最新的筆記內容同步回記憶體，防止被覆蓋
+    // ==========================================
+    if (AppState.curData) {
+        AppState.curData.subject = document.getElementById("edit-subject")?.value || AppState.curData.subject || "";
+        AppState.curData.judge = document.getElementById("edit-judge")?.value || AppState.curData.judge || "";
+        AppState.curData.feedback = document.getElementById("edit-feedback")?.value || AppState.curData.feedback || "";
+        AppState.curData.note = document.getElementById("edit-note")?.value || AppState.curData.note || "";
+        AppState.curData.currentStatus = document.getElementById("edit-current-status")?.value || AppState.curData.currentStatus || ""; // ★ 新增
+        AppState.curData.copyAddon = document.getElementById("edit-copy-addon")?.value || AppState.curData.copyAddon || ""; // ★ 新增
+        AppState.curData.yingqi = typeof window.getSettingsYingqiSnapshot === 'function' ? window.getSettingsYingqiSnapshot() : (AppState.curData.yingqi || null);
+    }
+
     if (!AppState.curData || !AppState.curData.lines) {
-        showAlert("這筆紀錄缺少原始爻資料，無法即時切換。請重新起卦！");
+        if (window.showAlert) window.showAlert("這筆紀錄缺少原始爻資料，無法即時切換。請重新起卦！");
         return;
     }
 
     let newNajiaVal, newFushenVal, newBianVal;
 
-    // 判斷是從導覽列(nav)還是電腦版右上角(pc)觸發的，去抓對應的值
+    // 判斷是從導覽列(nav)還是電腦版右上角(pc)觸發的
     if (source === 'pc') {
         newNajiaVal = $("pc-res-set-najia").value;
         newFushenVal = $("pc-res-set-fushen").value;
@@ -878,8 +1092,6 @@ window.applyResultSettings = function (source = 'nav') {
         newBianVal = $("res-set-bian").value;
     }
 
-    // 💡 核心效能判斷：「是否需要重新排盤？」
-    // 只有當納甲或伏神的設定，跟目前畫面上的不一樣時，才需要重新計算
     let needReCalc = (newNajiaVal !== AppState.curData.najiaValue || newFushenVal !== AppState.curData.fushenValue);
 
     // 更新狀態
@@ -887,23 +1099,20 @@ window.applyResultSettings = function (source = 'nav') {
     AppState.curData.fushenValue = newFushenVal;
     AppState.curData.bianViewValue = newBianVal;
 
+    if (AppState.curData.drawSnapshot) {
+        delete AppState.curData.drawSnapshot;
+    }
+
     if (needReCalc) {
-        // ⚠️ 納甲或伏神改變了，必須重新運算排盤並重繪整塊 HTML
         let res = solve(AppState.curData.lines, AppState.curData.bazi, newNajiaVal, newFushenVal);
         AppState.curData.ben = res.ben;
         AppState.curData.bian = res.bian;
         AppState.curData.rows = res.rows;
-        renderRes();
-    } else {
-        // 🚀 效能魔法：如果只有「變爻顯示」改變！
-        // 不呼叫 solve()，不呼叫 renderRes()，直接改表格外層標籤！
-        let table = document.querySelector(".gua-table");
-        if (table) {
-            table.setAttribute("data-bian", newBianVal);
-        }
     }
 
-    // ★ 核心：強制將「所有」選單同步為最新數值 (包含 PC 與 Nav)
+    if (typeof window.renderRes === 'function') window.renderRes();
+
+    // 強制將「所有」選單同步為最新數值
     if ($("res-set-najia")) $("res-set-najia").value = newNajiaVal;
     if ($("res-set-fushen")) $("res-set-fushen").value = newFushenVal;
     if ($("res-set-bian")) $("res-set-bian").value = newBianVal;
@@ -936,17 +1145,28 @@ const getGanClass = (gan) => {
 // ★★★ 表格與大表渲染 (啟用 2x2 網格與 Flex 水平鎖定) ★★★
 // ==========================================
 window.renderRes = function () {
+    if (!AppState.curData || !AppState.curData.rows) return;
+
+    // ====================================================
+    // ★ 核心優化：載入歷史紀錄時，自動套用該盤的專屬繪圖開關
+    // ====================================================
+    if (AppState.curData.isDrawModeEnabled !== undefined) {
+        AppState.isDrawModeEnabled = AppState.curData.isDrawModeEnabled;
+    }
+
+    // 1. 先取得目前「變爻顯示規則」的設定
+    let showBianRule = AppState.curData.bianViewValue || "move";
     $("result-view").style.overflow = "visible";
     $("result-view").style.display = "block"; // 確保不是 flex，flex 容易讓 sticky 失效
     AppState.activeYaoIdx = -1;
     AppState.currentRelFilter = '全';
-    let filterBar = $("rel-filter-bar");
-    if (filterBar && typeof window.toggleRelation === 'function') {
-        filterBar.style.display = "none";
-        document.querySelectorAll('.seal-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.innerText === '全');
-        });
-    }
+    //let filterBar = $("rel-filter-bar");
+    //if (filterBar && typeof window.toggleRelation === 'function') {
+    //    filterBar.style.display = "none";
+    //    document.querySelectorAll('.seal-btn').forEach(btn => {
+    //        btn.classList.toggle('active', btn.innerText === '全');
+    //    });
+    //}
 
     let relLinesGroup = $("rel-lines"); if (relLinesGroup) relLinesGroup.innerHTML = "";
     $("portal-view").style.display = "none"; $("result-view").style.display = "flex"; $("records-view").style.display = "none";
@@ -1042,21 +1262,72 @@ window.renderRes = function () {
         </div>`;
     };
 
+    // ==========================================
+    // ★ 準備頂部工具列 (複製 ➡️ 繪圖 ➡️ 重繪)
+    // ==========================================
+    let isDrawOn = (AppState.isDrawModeEnabled === true);
+    let hasDrawModule = typeof window.pro_getAdvancedYaoInfo === 'function';
+    let isRecord = (AppState.curRecIndex !== undefined && AppState.curRecIndex !== -1) || window.comesFromRecords === true;
+
+    // 1. 複製按鈕
+    //let copyBtnHtml = `<button onclick="copyResultAsText()" style="padding: 2px 8px; font-size: 0.85rem; background: #6c757d; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-family: inherit; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">📋 複製</button>`;
+    let copyBtnHtml = '';
+
+    // 2. 繪圖開關
+    let drawBtnHtml = hasDrawModule ? `
+    <button id="btn-toggle-draw" onclick="toggleDrawMode(!AppState.isDrawModeEnabled)" style="padding: 2px 8px; font-size: 0.85rem; border: none; border-radius: 4px; cursor: pointer; font-family: inherit; background: ${isDrawOn ? '#0d6efd' : '#6c757d'}; color: #fff; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.15); transition: background 0.2s; white-space: nowrap;">
+        🖌️ 繪圖
+    </button>` : '';
+
+    // 3. 重繪按鈕 (★ 修正 1：只有在歷史紀錄模式中，才會產生這顆按鈕)
+    let redrawBtnHtml = '';
+    if (isRecord) {
+        let isRedrawDisabled = !isDrawOn;
+        let disabledAttr = isRedrawDisabled ? "disabled" : "";
+
+        // ★ 修正 2：高級實體按鍵反灰質感 (淺灰底、灰字、無陰影)
+        let disabledStyle = isRedrawDisabled
+            ? "background: #e9ecef; color: #adb5bd; border: 1px solid #dee2e6; cursor: not-allowed; box-shadow: none;"
+            : "background: #17a2b8; color: #fff; border: 1px solid #17a2b8; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.15); transition: all 0.2s;";
+
+        redrawBtnHtml = `
+        <button onclick="redrawAndSaveSnapshot()" ${disabledAttr} style="padding: 2px 8px; font-size: 0.85rem; border-radius: 4px; font-family: inherit; font-weight: bold; white-space: nowrap; ${disabledStyle}">
+            🔄 重繪
+        </button>`;
+    }
+
+    // 4. 打包工具列
+    //let toolBarHtml = `
+    //<span style="display:inline-flex; align-items:center; gap: 6px;">
+    //    ${copyBtnHtml}
+    //    ${drawBtnHtml}
+    //    ${redrawBtnHtml}
+    //</span>`;
+
+    let toolBarHtml = `
+    <span style="display:inline-flex; align-items:center; gap: 6px;">
+        ${drawBtnHtml}
+        ${redrawBtnHtml}
+    </span>`;
+
+    // ==========================================
+    // ★ 產生排盤標頭 HTML (手機版與電腦版)
+    // ==========================================
     let headerHTML = "";
     if (isMobileMode) {
         let prevTerm = AppState.curData.jieQiInfo ? `本節: ${AppState.curData.jieQiInfo.prev.name} ${fmtDate(AppState.curData.jieQiInfo.prev.date)}` : "";
         let nextTerm = AppState.curData.jieQiInfo ? `次節: ${AppState.curData.jieQiInfo.next.name} ${fmtDate(AppState.curData.jieQiInfo.next.date)}` : "";
 
-        // ★ 準備南半球對沖的 UI 提示標籤
         let southBadgeMobile = AppState.curData.isSouthAdjust ?
             `<div style="text-align:center; margin-bottom:4px;"><span style="background-color:#dc3545; color:#fff; font-size:0.8em; padding:2px 8px; border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,0.2);">🌏 已啟用南半球節氣對沖</span></div>` : "";
 
         headerHTML = `
         <div id="bazi-anchor" class="mobile-info-wrapper" style="scroll-margin-top: 65px; padding:5px 4px; background:#fff; border-bottom:1px solid #ddd; margin-bottom:4px;">
            
-            <div style="font-weight:bold; text-align:center; font-size:1.05em; color:#333; margin-bottom:2px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <div style="font-weight:bold; text-align:center; font-size:1.05em; color:#333; margin-bottom:2px; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;">
                 <span>${AppState.curData.dateStr} ${(AppState.curData.method || "預設手動起卦").slice(2)}</span>
-                <button onclick="copyResultAsText()" style="padding: 2px 6px; font-size: 0.8rem; background: #6c757d; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-family: inherit;">📋 複製</button>
+                
+                ${toolBarHtml}
             </div>
             
             ${southBadgeMobile}
@@ -1068,27 +1339,17 @@ window.renderRes = function () {
             </div>
             
             <div style="display: flex; width: 100%; border-top: 1px dashed #eee; padding-top: 6px; align-items: stretch; margin-bottom: 2px;">
-                <!-- 左半部：八字 (4列直書) -->
                 <div style="flex: 1; display: flex; justify-content: space-around; border-right: 1px solid #ccc; min-width: 0; padding-right: 2px;">
-                    <div style="display:flex; flex-direction:column; align-items:center;">
-                        <span style="font-size:0.75em; color:#666; margin-bottom:2px;">時</span>
-                        <div style="font-weight:bold; font-size:1.35em; display:flex; flex-direction:column; line-height:1.2;">${cHTML(AppState.curData.bazi.H)}</div>
-                    </div>
-                    <div style="display:flex; flex-direction:column; align-items:center; background:#fff9e6; border-radius:2px; padding:0 2px;" id="bz-d">
-                        <span style="font-size:0.75em; color:#666; margin-bottom:2px;">日</span>
-                        <div style="font-weight:bold; font-size:1.35em; display:flex; flex-direction:column; line-height:1.2;">${cHTML(AppState.curData.bazi.D)}</div>
-                    </div>
-                    <div style="display:flex; flex-direction:column; align-items:center;" id="bz-m">
-                        <span style="font-size:0.75em; color:#666; margin-bottom:2px;">月</span>
-                        <div style="font-weight:bold; font-size:1.35em; display:flex; flex-direction:column; line-height:1.2;">${cHTML(AppState.curData.bazi.M)}</div>
-                    </div>
-                    <div style="display:flex; flex-direction:column; align-items:center;" id="bz-y">
-                        <span style="font-size:0.75em; color:#666; margin-bottom:2px;">年</span>
-                        <div style="font-weight:bold; font-size:1.35em; display:flex; flex-direction:column; line-height:1.2;">${cHTML(AppState.curData.bazi.Y)}</div>
-                    </div>
+                    ${(() => {
+                let bzH = `<div style="display:flex; flex-direction:column; align-items:center;"><span style="font-size:0.75em; color:#666; margin-bottom:2px;">時</span><div style="font-weight:bold; font-size:1.35em; display:flex; flex-direction:column; line-height:1.2;">${cHTML(AppState.curData.bazi.H)}</div></div>`;
+                let bzD = `<div style="display:flex; flex-direction:column; align-items:center; background:#fff9e6; border-radius:2px; padding:0 2px;" id="bz-d"><span style="font-size:0.75em; color:#666; margin-bottom:2px;">日</span><div style="font-weight:bold; font-size:1.35em; display:flex; flex-direction:column; line-height:1.2;">${cHTML(AppState.curData.bazi.D)}</div></div>`;
+                let bzM = `<div style="display:flex; flex-direction:column; align-items:center;" id="bz-m"><span style="font-size:0.75em; color:#666; margin-bottom:2px;">月</span><div style="font-weight:bold; font-size:1.35em; display:flex; flex-direction:column; line-height:1.2;">${cHTML(AppState.curData.bazi.M)}</div></div>`;
+                let bzY = `<div style="display:flex; flex-direction:column; align-items:center;" id="bz-y"><span style="font-size:0.75em; color:#666; margin-bottom:2px;">年</span><div style="font-weight:bold; font-size:1.35em; display:flex; flex-direction:column; line-height:1.2;">${cHTML(AppState.curData.bazi.Y)}</div></div>`;
+                // ★ 抽象同構：動態決定陣列順序
+                return (window.baziLayoutOrder === 'ltr') ? [bzY, bzM, bzD, bzH].join('') : [bzH, bzD, bzM, bzY].join('');
+            })()}
                 </div>
 
-                <!-- 右半部：神煞 (5列直書，彈性垂直分散對齊) -->
                 <div style="flex: 1; display: flex; justify-content: space-around; min-width: 0; padding-left: 2px;">
                     ${buildSSCol('空<br>亡', k1 + k2, true)}
                     ${buildSSCol('驛<br>馬', ma)}
@@ -1100,24 +1361,19 @@ window.renderRes = function () {
         </div>`;
     } else {
         let termStr = AppState.curData.jieQiInfo ? `<br><span style="font-size:0.9em; color:#666;">本節：${AppState.curData.jieQiInfo.prev.name} (${fmtDate(AppState.curData.jieQiInfo.prev.date)})<br>次節：${AppState.curData.jieQiInfo.next.name} (${fmtDate(AppState.curData.jieQiInfo.next.date)})</span>` : "";
-
-        // ⬇️ 用來產生選單選項的變數
         let najiaOpts = `<option value="standard" ${AppState.curData.najiaValue === 'standard' ? 'selected' : ''}>標準京房</option><option value="wu" ${AppState.curData.najiaValue === 'wu' ? 'selected' : ''}>乾自午起</option><option value="zang" ${AppState.curData.najiaValue === 'zang' ? 'selected' : ''}>藏山卜</option>`;
         let fushenOpts = `<option value="wang" ${AppState.curData.fushenValue === 'wang' ? 'selected' : ''}>卜筮正宗</option><option value="jing" ${AppState.curData.fushenValue === 'jing' ? 'selected' : ''}>京房易卦</option>`;
-        let bianOpts = `<option value="all" ${AppState.curData.bianViewValue === 'all' ? 'selected' : ''}>全顯變爻</option><option value="move" ${AppState.curData.bianViewValue === 'move' ? 'selected' : ''}>僅顯動爻</option>`;
+        let bianOpts = `<option value="move" ${AppState.curData.bianViewValue !== 'all' ? 'selected' : ''}>僅顯動爻</option><option value="all" ${AppState.curData.bianViewValue === 'all' ? 'selected' : ''}>全顯變爻</option>`;
+        let southBadgeDesktop = AppState.curData.isSouthAdjust ? `<br><span style="display:inline-block; margin-top:4px; background-color:#dc3545; color:#fff; font-size:0.85em; padding:2px 6px; border-radius:4px;">🌏 啟用南半球節氣對沖</span>` : "";
 
-        // ★ 準備南半球對沖的 UI 提示標籤 (電腦版)
-        let southBadgeDesktop = AppState.curData.isSouthAdjust ?
-            `<br><span style="display:inline-block; margin-top:4px; background-color:#dc3545; color:#fff; font-size:0.85em; padding:2px 6px; border-radius:4px;">🌏 啟用南半球節氣對沖</span>` : "";
-
-        // ★ 終極修復版：拔掉 <style>，直接把 CSS 寫死在標籤上 (保證絕對直排、絕對黑字)
         headerHTML = `
         <div id="bazi-anchor" style="display: flex; justify-content: space-between; align-items: stretch; width: 100%; border-bottom: 1px solid #ddd; padding-bottom: 8px; margin-bottom: 10px;">
             <div class="classic-info" style="flex: 1; padding-right: 15px; border-right: 1px dashed #eee;">
                 性別：<span>${AppState.curData.gender}</span><br>西元 <span>${AppState.curData.dateStr}</span><br>
-                <span style="color:var(--red); font-weight:bold; display: inline-flex; align-items: center; gap: 8px;">
+                <span style="color:var(--red); font-weight:bold; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     ${(AppState.curData.method || "預設手動起卦").slice(2)}
-                    <button onclick="copyResultAsText()" style="padding: 2px 6px; font-size: 0.85rem; background: #6c757d; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-family: inherit;">📋 複製</button>
+                    
+                    ${toolBarHtml}
                 </span>
                 
                 ${southBadgeDesktop}<br>
@@ -1125,30 +1381,19 @@ window.renderRes = function () {
                 <span style="color:var(--green); font-size:0.9em;">${AppState.curData.solarNote}</span>${termStr}
             </div>
             
-            <!-- ★ 中區塊：八字與神煞 (強制直排、強制黑色) -->
             <div class="right-header-group" style="flex: 2; display: flex; justify-content: center; align-items: center; gap: 35px; padding: 0 15px;">
                 
-                <!-- 八字區塊 -->
                 <div class="bazi-box" style="display: flex; gap: 15px;">
-                    <div class="bazi-col" style="width: 38px; display: flex; flex-direction: column; align-items: center;">
-                        <div style="font-size: 1.1em; margin-bottom: 4px; color: #666;">時</div>
-                        <div style="font-size: 1.5em; display: flex; flex-direction: column; line-height: 1.2; align-items: center; font-weight: bold; color: #333 !important;">${cHTML(AppState.curData.bazi.H)}</div>
-                    </div>
-                    <div class="bazi-col" style="width: 38px; display: flex; flex-direction: column; align-items: center; background:#fff9e6; border-radius: 4px;">
-                        <div style="font-size: 1.1em; margin-bottom: 4px; color: #666;">日</div>
-                        <div id="bz-d" style="font-size: 1.5em; display: flex; flex-direction: column; line-height: 1.2; align-items: center; font-weight: bold; color: #333 !important;">${cHTML(AppState.curData.bazi.D)}</div>
-                    </div>
-                    <div class="bazi-col" style="width: 38px; display: flex; flex-direction: column; align-items: center;">
-                        <div style="font-size: 1.1em; margin-bottom: 4px; color: #666;">月</div>
-                        <div id="bz-m" style="font-size: 1.5em; display: flex; flex-direction: column; line-height: 1.2; align-items: center; font-weight: bold; color: #333 !important;">${cHTML(AppState.curData.bazi.M)}</div>
-                    </div>
-                    <div class="bazi-col" style="width: 38px; display: flex; flex-direction: column; align-items: center;">
-                        <div style="font-size: 1.1em; margin-bottom: 4px; color: #666;">年</div>
-                        <div id="bz-y" style="font-size: 1.5em; display: flex; flex-direction: column; line-height: 1.2; align-items: center; font-weight: bold; color: #333 !important;">${cHTML(AppState.curData.bazi.Y)}</div>
-                    </div>
+                    ${(() => {
+                let deskBzH = `<div class="bazi-col" style="width: 38px; display: flex; flex-direction: column; align-items: center;"><div style="font-size: 1.1em; margin-bottom: 4px; color: #666;">時</div><div style="font-size: 1.5em; display: flex; flex-direction: column; line-height: 1.2; align-items: center; font-weight: bold; color: #333 !important;">${cHTML(AppState.curData.bazi.H)}</div></div>`;
+                let deskBzD = `<div class="bazi-col" style="width: 38px; display: flex; flex-direction: column; align-items: center; background:#fff9e6; border-radius: 4px;"><div style="font-size: 1.1em; margin-bottom: 4px; color: #666;">日</div><div id="bz-d" style="font-size: 1.5em; display: flex; flex-direction: column; line-height: 1.2; align-items: center; font-weight: bold; color: #333 !important;">${cHTML(AppState.curData.bazi.D)}</div></div>`;
+                let deskBzM = `<div class="bazi-col" style="width: 38px; display: flex; flex-direction: column; align-items: center;"><div style="font-size: 1.1em; margin-bottom: 4px; color: #666;">月</div><div id="bz-m" style="font-size: 1.5em; display: flex; flex-direction: column; line-height: 1.2; align-items: center; font-weight: bold; color: #333 !important;">${cHTML(AppState.curData.bazi.M)}</div></div>`;
+                let deskBzY = `<div class="bazi-col" style="width: 38px; display: flex; flex-direction: column; align-items: center;"><div style="font-size: 1.1em; margin-bottom: 4px; color: #666;">年</div><div id="bz-y" style="font-size: 1.5em; display: flex; flex-direction: column; line-height: 1.2; align-items: center; font-weight: bold; color: #333 !important;">${cHTML(AppState.curData.bazi.Y)}</div></div>`;
+                // ★ 抽象同構：動態決定陣列順序
+                return (window.baziLayoutOrder === 'ltr') ? [deskBzY, deskBzM, deskBzD, deskBzH].join('') : [deskBzH, deskBzD, deskBzM, deskBzY].join('');
+            })()}
                 </div>
 
-                <!-- 神煞區塊 -->
                 <table class="ss-table" style="border-collapse: collapse;">
                     <tbody><tr>
                         <td style="padding: 0 10px; text-align: center; vertical-align: top;">
@@ -1175,7 +1420,6 @@ window.renderRes = function () {
                 </table>
             </div>
 
-            <!-- 右區塊：排盤系統設定 -->
             <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; border-left: 1px dashed #eee; padding-left: 15px; font-size: 0.9em;">
                 <div style="display:flex; align-items:center; justify-content:flex-end; gap:5px;">
                     <label style="color:#666; white-space:nowrap;">納甲:</label>
@@ -1248,53 +1492,98 @@ window.renderRes = function () {
     let html = "";
     if (isMobileMode) {
         // ★ 新增「伏親」欄位
-        document.querySelector(".gua-table thead").innerHTML = `<tr><th>伏親</th><th>伏神</th><th>六獸</th><th>六親</th><th>本卦</th><th>干支</th><th>變卦</th><th>變親</th></tr>`;
+        document.querySelector(".gua-table thead").innerHTML = `<tr><th>伏親</th><th>伏神</th><th>六獸</th><th>本卦</th><th>六親</th><th>干支</th><th>變親</th><th>干支</th></tr>`;
     } else {
         // ★ 電腦版也獨立抽出「伏親」
-        document.querySelector(".gua-table thead").innerHTML = `<tr><th width="6%">伏親</th><th width="12%">伏神</th><th width="32%"><th width="8%">六獸</th>【 本 卦 】(點干支看關係)</th><th width="8%"></th><th width="34%">【 變 卦 】</th></tr>`;
+        document.querySelector(".gua-table thead").innerHTML = `<tr>
+            <th width="8%">六獸</th>
+            <th width="6%">伏親</th>
+            <th width="12%">伏神</th>
+            <th width="32%">【 本 卦 】(點干支看關係)</th>
+            <th width="8%">動爻</th>
+            <th width="34%">【 變 卦 】</th>
+        </tr>`;
     }
 
-    let showBianRule = AppState.curData.bianViewValue;
     if (!showBianRule) { showBianRule = "move"; if ($("res-set-bian")) $("res-set-bian").value = "move"; }
     // 將目前的變爻顯示狀態，綁定在整個表格的外層
     document.querySelector(".gua-table").setAttribute("data-bian", showBianRule);
 
-    AppState.curData.rows.forEach((r, i) => {
-        // 💡 效能魔法：不再由 JS 決定要不要印，只要有變卦，我們就全印！
-        let showThisBian = isGuaChanged;
+    // ==========================================
+    // ★ 獨立精簡版：未開啟繪圖時的基礎三印章
+    // ==========================================
+    const generateBasicStamps = (targetGz) => {
+        try {
+            if (!targetGz) return "";
+            let targetZ = Zhi.indexOf(targetGz.slice(1, 2));
+            if (targetZ === -1) return "";
 
-        // 💡 如果這個爻「沒有發動」，我們幫它加上專屬的隱藏 class
-        let staticBianClass = (!r.move) ? "ly-static-bian" : "";
-        let tgtHtml = buildGzBlock(r.gz, r.status, `yao-tgt-${i}`, true);
-        // 💡 提取伏神的六親字串
+            let mZ = AppState.curData.bazi.mZ;
+            let dZ = AppState.curData.bazi.dZ;
+            let s = "";
+
+            // 1. 空亡
+            let dG = AppState.curData.bazi.dG;
+            let k1 = (10 - dG + dZ) % 12; if (k1 < 0) k1 += 12;
+            let k2 = (11 - dG + dZ) % 12; if (k2 < 0) k2 += 12;
+            if (targetZ === k1 || targetZ === k2) {
+                s += '<span class="mark-break">空亡</span>';
+            }
+
+            // 2. 月破
+            if (Math.abs(targetZ - mZ) === 6) {
+                s += `<span class="mark-break" style="background-color:#dc3545; box-shadow: 1px 1px 2px rgba(0,0,0,0.2);">月破</span>`;
+            }
+
+            // 3. 日沖 (嚴格限制只顯示「日沖」二字)
+            if (Math.abs(targetZ - dZ) === 6) {
+                s += `<span class="mark-break" style="background-color:#6f42c1; box-shadow: 1px 1px 2px rgba(0,0,0,0.2);">日沖</span>`;
+            }
+            return s;
+        } catch (e) {
+            console.error("基礎印章產生錯誤:", e);
+            return "";
+        }
+    };
+
+    // ★ 修正 1：在進入迴圈前，先取得目前「變爻顯示規則」的設定
+    AppState.curData.rows.forEach((r, i) => {
+
+        let showThisBian = isGuaChanged;
+        if (showBianRule === "move" && (!r.move || r.move === "")) {
+            showThisBian = false;
+        }
+
+        let isDrawOn = AppState.isDrawModeEnabled === true;
+        let staticBianClass = (!r.move || r.move === "") ? "ly-static-bian" : "";
+
+        // ★ 核心切換：開繪圖才讀取外掛印章 (r.status)，關繪圖一律自己算 (generateBasicStamps)
+        let finalTgtStatus = isDrawOn ? (r.status || "") : generateBasicStamps(r.gz);
+        let tgtHtml = buildGzBlock(r.gz, finalTgtStatus, `yao-tgt-${i}`, isDrawOn);
+
         let fuRelText = r.fuRel ? r.fuRel.substr(0, 2) : "";
         let fuHtml = "", fuHtmlDesk = "";
 
+        // 處理伏神
         if (r.fuGz) {
-            // ★ 核心修正：廢棄 buildFuBlock，直接套用一般干支的 buildGzBlock，讓天干五行比照一般爻位顯示！
-            let fuBlock = buildGzBlock(r.fuGz, r.fuKp, `yao-fu-${i}`, true);
+            let finalFuStatus = isDrawOn ? (r.fuKp || "") : generateBasicStamps(r.fuGz);
+            let fuBlock = buildGzBlock(r.fuGz, finalFuStatus, `yao-fu-${i}`, isDrawOn);
             if (isMobileMode) fuHtml = fuBlock;
             else fuHtmlDesk = fuBlock;
         }
 
         let barHtml = (r.bar === "solid") ? `<div class="yao-bar y-s"></div>` : `<div class="yao-bar y-b"><span></span><span></span></div>`;
-
-        // ★ 修正 1：給空的世應一個佔位盒子 (寬度對應 CSS)
-        let syMark = r.shi ? `<div class="sy-mark">${r.shi}</div>` : `<div style="width:14px; height:14px;"></div>`;
-
-        /// ★ 使用幾何圓圈 ○ 與數學乘號 × 來提升質感
+        let syMark = r.shi ? `<div class="sy-mark">${r.shi}</div>` : `<div class="sy-mark" style="opacity:0;">無</div>`;
         let moveMark = r.move ? `<div class="move-mark">${r.move.includes("O") ? "○" : "×"}</div>` : `<div style="width:12px;"></div>`;
 
         let barHtmlDesk = (r.bar === "solid") ? `<div class="y-solid"></div>` : `<div class="y-broken"><span></span><span></span></div>`;
-
-        let deskShi = r.shi ? `<span class="${r.shi === '世' ? 'marker-shi' : 'marker-ying'}">${r.shi}</span>` : `<span style="display:inline-block;width:16px;"></span>`;
-
-
-        // 電腦版的長箭頭旁邊的符號也同步更換
-        let moveDisplay = r.move ? `<div class="desk-move-box"><span class="desk-move-mark">${r.move.includes("O") ? "○" : "×"}</span><div class="desk-long-arrow"></div></div>` : "";
+        let deskShi = r.shi ? `<span class="ly-core-badge ${r.shi === '世' ? 'badge-shi' : 'badge-ying'}">${r.shi}</span>` : `<span style="display:inline-block;width:29px;"></span>`;
+        let deskMoveDisplay = r.move ? `<div class="desk-move-box"><span class="ly-core-badge ${r.move.includes("O") ? 'badge-old-yang' : 'badge-old-yin'}">${r.move.includes("O") ? "○" : "✕"}</span><div class="desk-long-arrow"></div></div>` : "";
         let bianGan = "", bianQin = "", bianContentHtml = "";
+
         if (showThisBian && r.bgz) {
-            let bBlock = buildGzBlock(r.bgz, r.bstatus, `yao-src-${i}`, true);
+            let finalBianStatus = isDrawOn ? (r.bstatus || "") : generateBasicStamps(r.bgz, false);
+            let bBlock = buildGzBlock(r.bgz, finalBianStatus, `yao-src-${i}`, isDrawOn);
             if (isMobileMode) {
                 bianGan = bBlock;
                 bianQin = `<div style="font-size:0.9rem; font-weight:bold; margin-top:5px; color:#555;">${r.br}</div>`;
@@ -1302,37 +1591,47 @@ window.renderRes = function () {
             else {
                 let bBarHtml = (r.bbar === "solid") ? `<div class="y-solid"></div>` : `<div class="y-broken"><span></span><span></span></div>`;
                 let bShi = r.bShi ? `<span class="${r.bShi === '世' ? 'marker-shi' : 'marker-ying'}">${r.bShi}</span>` : "";
-                bianContentHtml = `<div class="bian-container flex-center gap-10"><div class="yao-visual">${bBarHtml}</div>${bBlock}<span class="col-rel" style="font-size:1.05em; font-weight::bold; color:#333;">${r.br}</span>${bShi}</div>`;
+                bianContentHtml = `<div class="bian-container flex-center gap-10"><div class="yao-visual">${bBarHtml}</div>${bBlock}<span class="col-rel" style="font-size:1.05em; font-weight:bold; color:#333;">${r.br}</span>${bShi}</div>`;
             }
         }
 
-        // ★ 完全修復變數錯誤，並完美套用寬度控制類別與直書樣式
         if (isMobileMode) {
-            // 定義統一的直書放大樣式
             const verticalStyle = `style="writing-mode: vertical-rl; text-orientation: upright; font-size: 1.1rem !important; font-weight: bold; text-align: center; padding: 4px 2px; vertical-align: middle;"`;
             const verticalStyleGray = `style="writing-mode: vertical-rl; text-orientation: upright; font-size: 1.1rem !important; font-weight: bold; text-align: center; padding: 4px 2px; vertical-align: middle; color: #666;"`;
 
+            // ★ 修正 3：改用 mobileMoveDisplay 變數名稱
+            //let mobileMoveDisplay = r.move ? `<div class="move-mark" style="font-size: ${r.move.includes("O") ? 'inherit' : '1.15em'}; font-family: sans-serif;">${r.move.includes("O") ? "○" : "✕"}</div>` : `<div class="move-mark" style="opacity:0;">○</div>`;
+            //let syDisplay = r.shi ? `<div class="sy-mark">${r.shi}</div>` : `<div class="sy-mark" style="opacity:0; border-color:transparent; background:transparent;">無</div>`;
+            let mobileMoveDisplay = r.move ? `<div class="ly-core-badge ${r.move.includes("O") ? 'badge-old-yang' : 'badge-old-yin'}">${r.move.includes("O") ? "○" : "✕"}</div>` : `<div class="ly-core-badge" style="opacity:0;">○</div>`;
+            let syDisplay = r.shi ? `<div class="ly-core-badge ${r.shi === '世' ? 'badge-shi' : 'badge-ying'}">${r.shi}</div>` : `<div class="ly-core-badge" style="opacity:0;">無</div>`;
             html += `<tr>
                 <td class="col-rel" ${verticalStyleGray}>${fuRelText}</td>
                 <td>${fuHtml}</td>
                 <td class="beast-col" ${verticalStyle}>${r.bst}</td>
+                <td>
+                    <div class="ben-wrapper">
+                        <div class="ben-line-row">${barHtml}</div>
+                        <div class="ben-meta-row">${syDisplay}${mobileMoveDisplay}</div>
+                    </div>
+                </td>
                 <td class="col-rel" ${verticalStyle}>${r.rel.substr(0, 2)}</td>
-                <td><div class="ben-wrapper">${barHtml}${syMark}${moveMark}</div></td>
                 <td>${tgtHtml}</td>
-                <td class="${staticBianClass}">${bianGan}</td>
-                <td class="col-rel ${staticBianClass}" ${verticalStyle}>${r.bgz ? r.br.substr(0, 2) : ''}</td>
+                
+                <td class="col-rel ${staticBianClass}" ${verticalStyle}>${(showThisBian && r.bgz) ? r.br.substr(0, 2) : ''}</td>
+                
+                <td class="${staticBianClass}">${showThisBian ? bianGan : ''}</td>
             </tr>`;
         } else {
             html += `<tr>
                 <td>${r.bst}</td>
-                <td class="col-rel text-gray" style="font-size:0.9em; font-weight:bold;">${fuRelText}</td> <!-- ★ 新增：獨立伏親 -->
+                <td class="col-rel text-gray" style="font-size:0.9em; font-weight:bold;">${fuRelText}</td>
                 <td class="col-fu">${fuHtmlDesk}</td>
                 <td class="text-center">
                     <div class="desk-yao-row">
                         ${deskShi}<b class="col-rel">${r.rel}</b><div class="yao-visual">${barHtmlDesk}</div>${tgtHtml}
                     </div>
                 </td>
-                <td class="move-arrow">${moveDisplay}</td>
+                <td class="move-arrow">${deskMoveDisplay}</td>
                 <td class="text-center ${staticBianClass}">${bianContentHtml}</td>
             </tr>`;
         }
@@ -1406,8 +1705,9 @@ window.renderRes = function () {
     let dayPo = Zhi[(AppState.curData.bazi.dZ + 6) % 12], monthPo = Zhi[(AppState.curData.bazi.mZ + 6) % 12];
 
     let promptsHTML = `
-    <details id="details-table" class="notes-section" style="margin-top: 10px; margin-bottom: 5px;"> 
-        <summary class="notes-summary">📊 綜合五行理氣大表 (點擊展開)</summary> 
+    <details id="details-table" class="notes-section" style="margin-top: 10px; margin-bottom: 5px;" 
+             ontoggle="window.AppState.isScoreDetailsOpen = this.open"> 
+        <summary class="notes-summary">📊 綜合五行理氣大表 (點擊展開)</summary>
         <div style="overflow-x: auto; padding: 5px; background: #fff;">
         <style>
     .adv-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; border: 2px solid #555; flex-shrink: 0; }
@@ -1449,56 +1749,181 @@ window.renderRes = function () {
     if ($("edit-judge")) $("edit-judge").value = AppState.curData.judge || "";
     if ($("edit-feedback")) $("edit-feedback").value = AppState.curData.feedback || "";
     if ($("edit-note")) $("edit-note").value = AppState.curData.note || "";
+    // ★ 新增現況與加註填寫
+    if ($("edit-current-status")) $("edit-current-status").value = AppState.curData.currentStatus || "";
+    if ($("edit-copy-addon")) {
+        let defaultAddonText = "請參照來源資料《六爻解卦標準流程》的步驟與規範詳細解卦，並以問卦日期前輟生成解卦結果檔案。";
+        let addonVal = AppState.curData.copyAddon !== undefined ? AppState.curData.copyAddon : defaultAddonText;
+        $("edit-copy-addon").value = addonVal;
+        
+        let cbAddon = $("cb-default-addon");
+        if (cbAddon) {
+            // 如果內容與預設文字相同，則勾選；否則取消勾選
+            cbAddon.checked = (addonVal === defaultAddonText);
+        }
+    }
+    // 讀取時一併還原專屬應期與萬年曆狀態
+    if (AppState.curData.yingqi && typeof window.restoreYingqiSnapshot === 'function') {
+        window.restoreYingqiSnapshot(AppState.curData.yingqi);
+    } else if (typeof window.restoreYingqiSnapshot === 'function') {
+        window.restoreYingqiSnapshot(null); // 新盤清空應期
+    }
 
     // ★ 唯讀與按鈕顯示邏輯 (已修復：加入主旨，且新盤也預設上鎖)
     let isHistory = window.comesFromRecords || AppState.curRecIndex > -1;
-    
-    // ★ 1. 加入 sEl (主旨)
+
+    // ★ 1. 加入主旨、現況與加註
     let sEl = $("edit-subject"), jEl = $("edit-judge"), fEl = $("edit-feedback"), nEl = $("edit-note");
+    let csEl = $("edit-current-status"), caEl = $("edit-copy-addon");
+    let cbAddon = $("cb-default-addon"); // ★ 抓取 checkbox
     let eBtn = $("btn-edit-notes"), uBtn = $("btn-update-rec");
 
-    let tablePanel = document.getElementById("details-table"); 
-    let notesPanel = document.querySelector(".edit-area") ? document.querySelector(".edit-area").closest("details") : null; 
+    let tablePanel = document.getElementById("details-table");
+    let notesPanel = document.querySelector(".edit-area") ? document.querySelector(".edit-area").closest("details") : null;
     let isEditingNotes = uBtn && (uBtn.style.display === "inline-block" || uBtn.style.display === "block");
 
-    // ★ 2. 關鍵修改：不管是不是歷史紀錄，只要不在編輯狀態，一律上鎖！
+    // ★ 唯讀與按鈕顯示邏輯 (外框常駐與立體感美化版)
     if (!isEditingNotes) {
-        [sEl, jEl, fEl, nEl].forEach(el => {
-            if (el) { 
-                el.readOnly = true; 
-                el.style.backgroundColor = "transparent"; 
-                el.style.color = "#555"; 
-                el.style.borderColor = "transparent"; 
+        [sEl, jEl, fEl, nEl, csEl, caEl].forEach(el => {
+            if (el) {
+                el.readOnly = true;
+                el.style.backgroundColor = "transparent";
+                el.style.color = "#555";
+                el.style.border = "1px solid #e2e8f0";
+                el.style.borderRadius = "4px";
                 el.style.boxShadow = "none";
+                el.style.padding = "6px 8px";
             }
         });
-        if (eBtn) eBtn.style.display = "inline-block"; // 顯示編輯筆
-        if (uBtn) uBtn.style.display = "none";         // 隱藏更新按鈕
+        if (cbAddon) cbAddon.disabled = true; // ★ 鎖定 checkbox
+        if (eBtn) eBtn.style.display = "inline-block";
+        if (uBtn) uBtn.style.display = "none";
 
-        if (tablePanel) tablePanel.open = false; 
-        if (notesPanel) notesPanel.open = true; 
+        // ★ 核心變更：不再盲目寫死為 false，而是讀取使用者的記憶狀態！
+        if (tablePanel) tablePanel.open = window.AppState.isScoreDetailsOpen;
+        if (notesPanel) notesPanel.open = true;
     } else {
-        // 解鎖狀態
-        [sEl, jEl, fEl, nEl].forEach(el => {
+        // 解鎖狀態 (編輯中)
+        [sEl, jEl, fEl, nEl, csEl, caEl].forEach(el => {
             if (el) {
                 el.readOnly = false;
                 el.style.backgroundColor = "#fff";
                 el.style.color = "#000";
-                el.style.borderColor = "#80bdff";
+                el.style.border = "1px solid #80bdff";
+                el.style.borderRadius = "4px";
+                el.style.boxShadow = "0 0 0 0.2rem rgba(0,123,255,.25)";
+                el.style.padding = "6px 8px";
             }
         });
+        if (cbAddon) cbAddon.disabled = false; // ★ 解鎖 checkbox
         if (eBtn) eBtn.style.display = "none";
-        // ★ 3. 新盤不准顯示更新紀錄按鈕，交給上方的儲存按鈕
         if (uBtn) uBtn.style.display = isHistory ? "inline-block" : "none";
-        
-        if (tablePanel && !isHistory) tablePanel.open = false;
-        if (notesPanel && !isHistory) notesPanel.open = true;
+
+        // ★ 核心變更：解鎖編輯時，也依照記憶體狀態決定是否展開大表
+        if (tablePanel) tablePanel.open = window.AppState.isScoreDetailsOpen;
+        if (notesPanel) notesPanel.open = true;
     }
-    
+
+    // ★ 新增：回收桶預覽模式的「視覺隱藏防線」
+    let topSaveBtn = document.querySelector('.nav-btn-save'); // 抓取上方的儲存按鈕
+
+    if (AppState.curData && AppState.curData.isTrashPreview) {
+        // 如果是回收桶預覽，把所有跟存檔、修改有關的按鈕全部藏起來
+        if (topSaveBtn) topSaveBtn.style.display = "none";
+        if (eBtn) eBtn.style.display = "none";
+        if (uBtn) uBtn.style.display = "none";
+    } else {
+        // 恢復正常狀態下的顯示
+        if (topSaveBtn) topSaveBtn.style.display = "inline-block";
+    }
+
     if (typeof window.renderHistoryLog === 'function') {
         window.renderHistoryLog();
     }
-} // <--- 這裡是 window.renderRes 的結尾大括號！
+    // ===================================================
+    // ★ 工具列與畫布最尾端受控管理
+    // ===================================================
+    let filterBar = document.getElementById("rel-filter-bar");
+    let svgCanvas = document.getElementById("rel-svg");
+
+    if (AppState.isDrawModeEnabled) {
+        if (filterBar) filterBar.style.display = "flex";
+        if (svgCanvas) svgCanvas.style.display = "block";
+
+        // 1. 如果有存過快照，就直接還原之前的樣貌
+        if (AppState.curData.drawSnapshot && typeof window.restoreDrawSnapshot === 'function') {
+            window.restoreDrawSnapshot();
+        }
+        // 2. ★ 核心升級：如果沒有快照，不再等待點擊，直接發動「全盤連線」並自動拍下初始快照！
+        else {
+            if (typeof window.drawRelations === 'function') {
+                window.drawRelations('all', null);
+                AppState.activeYaoIdx = 'all';
+                if (typeof window.createDrawSnapshot === 'function') {
+                    AppState.curData.drawSnapshot = window.createDrawSnapshot();
+                    if (typeof window.silentAutoSaveRecord === 'function') window.silentAutoSaveRecord();
+                }
+
+                // ★ 新增：首次開啟繪圖，展示全盤 2.5 秒後自動切換到「無」
+                if (window.showToast) window.showToast("✅ 繪圖模式已啟動，全盤解析完成！", 2500);
+                setTimeout(() => {
+                    if (AppState.isDrawModeEnabled && typeof window.setRelFilter === 'function') {
+                        window.setRelFilter('無');
+                    }
+                }, 1200);
+
+            } else {
+                AppState.activeYaoIdx = -1;
+            }
+        }
+    } else {
+        if (filterBar) filterBar.style.display = "none";
+        if (svgCanvas) {
+            svgCanvas.style.display = "none";
+            let relLines = document.getElementById("rel-lines");
+            if (relLines) relLines.innerHTML = "";
+        }
+        AppState.activeYaoIdx = -1;
+
+        // ★ 新增修復：重新起卦或未開啟繪圖時，徹底隱藏殘留的分數明細框與重置狀態
+        AppState.scoreDetailOpen = false;
+        let detailBox = document.getElementById("score-detail-box");
+        if (detailBox) detailBox.style.display = "none";
+    }
+
+    // ==========================================
+    // 大表渲染時，自動初始化並喚醒頂部「核心應期主控區」
+    // ==========================================
+    if (typeof window.initCoreHUDSelects === 'function') {
+        window.initCoreHUDSelects(); // 灌入下拉選單字典
+    }
+
+    if (AppState.curData && AppState.curData.dateStr) {
+        // 如果有存好的應期快照，優先使用應期；否則預設使用起卦時間
+        let baseTimeStr = AppState.curData.yingqi?.date
+            ? `${AppState.curData.yingqi.date} ${AppState.curData.yingqi.time || '12:00'}`
+            : AppState.curData.dateStr;
+
+        let baseDate = new Date(baseTimeStr.replace(/\//g, '-'));
+        if (!isNaN(baseDate.getTime()) && typeof window.renderDateToCoreHUD === 'function') {
+            window.renderDateToCoreHUD(baseDate); // 讓核心區浮現時間
+        }
+    }
+
+    // ==========================================
+    // ★ 依照使用者的五大規則還原應期面板的展開狀態
+    // ==========================================
+    if (typeof window.toggleCoreYingqiHud === 'function') {
+        let wasOpen = AppState.curData.yingqi && AppState.curData.yingqi.isOpen;
+
+        // ★ 放寬規則：不再綁定 isApplied，只要離開時是展開的，下次就維持展開
+        if (wasOpen) {
+            window.toggleCoreYingqiHud(true);
+        } else {
+            window.toggleCoreYingqiHud(false);
+        }
+    }
+};
 
 // 點擊「編輯」按鈕時觸發
 window.enableNotesEdit = function (e) {
@@ -1506,19 +1931,22 @@ window.enableNotesEdit = function (e) {
 
     // ★ 4. 加入 sEl (主旨)
     let sEl = $("edit-subject"), jEl = $("edit-judge"), fEl = $("edit-feedback"), nEl = $("edit-note");
-    [sEl, jEl, fEl, nEl].forEach(el => {
+    let csEl = $("edit-current-status"), caEl = $("edit-copy-addon");
+    let cbAddon = $("cb-default-addon"); // ★ 抓取 checkbox
+
+    [sEl, jEl, fEl, nEl, csEl, caEl].forEach(el => {
         if (el) {
             el.readOnly = false;
             el.style.backgroundColor = "#fff";
             el.style.color = "#000";
-            el.style.borderColor = "#80bdff"; 
+            el.style.borderColor = "#80bdff";
             el.style.boxShadow = "0 0 0 0.2rem rgba(0,123,255,.25)";
         }
     });
-
+    if (cbAddon) cbAddon.disabled = false; // ★ 解鎖 checkbox
     // 切換按鈕
     if ($("btn-edit-notes")) $("btn-edit-notes").style.display = "none";
-    
+
     let uBtn = $("btn-update-rec");
     if (uBtn) {
         // ★ 5. 確保剛排完的新盤，點了編輯也不會跑出更新按鈕
@@ -1530,10 +1958,34 @@ window.enableNotesEdit = function (e) {
     else if (jEl) jEl.focus();
 };
 
-// ==========================================
 // ★ 排盤結果轉換為純文字複製功能 (最終對齊與設定連動版)
-// ==========================================
-window.copyResultAsText = function() {
+window.copyResultAsText = function () {
+    // ==========================================
+    // ★ 複製前強制同步：抓取畫面上最新的輸入框內容
+    // ==========================================
+    if (window.AppState && window.AppState.curData) {
+        let curSubject = document.getElementById("edit-subject")?.value;
+        if (curSubject !== undefined) {
+            window.AppState.curData.question = curSubject;
+            window.AppState.curData.subject = curSubject;
+        }
+
+        let curJudge = document.getElementById("edit-judge")?.value;
+        if (curJudge !== undefined) window.AppState.curData.judge = curJudge;
+
+        let curFeedback = document.getElementById("edit-feedback")?.value;
+        if (curFeedback !== undefined) window.AppState.curData.feedback = curFeedback;
+
+        let curNote = document.getElementById("edit-note")?.value;
+        if (curNote !== undefined) window.AppState.curData.note = curNote;
+
+        let curStatus = document.getElementById("edit-current-status")?.value;
+        if (curStatus !== undefined) window.AppState.curData.currentStatus = curStatus;
+
+        let copyAddon = document.getElementById("edit-copy-addon")?.value;
+        if (copyAddon !== undefined) window.AppState.curData.copyAddon = copyAddon;
+    }
+
     let d = AppState.curData;
     if (!d || !d.lines) {
         if (window.showToast) window.showToast("⚠️ 沒有可複製的排盤資料！");
@@ -1552,7 +2004,7 @@ window.copyResultAsText = function() {
     let kongwang = ZhiList[k1_idx] + ZhiList[k2_idx];
 
     let lines = [];
-    lines.push("========== 六爻排盤 ==========");
+    lines.push("【 ☯ 六爻排盤 ☯ 】");
     if (d.question) lines.push(`占問事項：${d.question}`);
     lines.push(`起卦時間：${d.dateStr} ${d.solarNote || ''}`);
     lines.push(`起卦方式：${(d.method || "").slice(2) || "手動起卦"}`);
@@ -1581,21 +2033,21 @@ window.copyResultAsText = function() {
     // ★ 核心修正：從 rows[0] (上爻) 往下印到 rows[5] (初爻)，確保不會頭下腳上！
     for (let i = 0; i <= 5; i++) {
         let r = d.rows[i];
-        
+
         let fuStr = padZW(r.fuGz ? (r.fuRel.substr(0, 2) + r.fuGz) : "", 5);
         let bst = padZW(r.bst, 2);
-        
+
         let shiStr = r.shi ? r.shi : " ";
         let relFull = r.rel || "";
-        if (relFull.length <= 2 && r.gz) relFull += r.gz; 
+        if (relFull.length <= 2 && r.gz) relFull += r.gz;
         let benStr = padZW(shiStr + relFull, 6);
-        
+
         let yaoSym = (r.bar === "solid") ? "━━━" : "━ ━";
         let moveSym = r.move ? (r.move.includes("O") ? "○" : "✕") : " ";
         let centerStr = `${yaoSym} ${moveSym}`;
 
         // ★ 變卦顯示邏輯連動：若無變卦或選擇不顯示，就維持乾淨的空白
-        let bianStr = ""; 
+        let bianStr = "";
         if (isGuaChanged) {
             let shouldShowBian = (bianViewMode === "all" || r.move);
             if (shouldShowBian && r.bgz) {
@@ -1610,9 +2062,18 @@ window.copyResultAsText = function() {
 
         lines.push(`${fuStr} ${bst} ${benStr} ${centerStr} ${bianStr}`);
     }
-    lines.push("==============================");
+    lines.push("");
+    lines.push("------------------------------");
+    lines.push("");
 
-    let finalTxt = lines.join("\n");
+    // ★ 根據文字內容決定是否加入複製內容 (有輸入文字才會顯示)
+    if (d.copyAddon && d.copyAddon.trim()) lines.push(`【注意】\n${d.copyAddon.trim()}\n`);
+    if (d.currentStatus && d.currentStatus.trim()) lines.push(`【現況說明】\n${d.currentStatus.trim()}\n`);
+    if (d.judge && d.judge.trim()) lines.push(`【占斷結果】\n${d.judge.trim()}\n`);
+    if (d.feedback && d.feedback.trim()) lines.push(`【事後回饋】\n${d.feedback.trim()}\n`);
+    if (d.note && d.note.trim()) lines.push(`【備註】\n${d.note.trim()}\n`);
+
+    let finalTxt = lines.join("\n").trim(); // 去除尾部多餘換行
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(finalTxt).then(() => {
@@ -1644,7 +2105,7 @@ function fallbackCopyTextToClipboard(text) {
         } else if (window.showAlert) {
             window.showAlert("您的瀏覽器不支援自動複製，請手動圈選複製。");
         }
-    } catch(err) {
+    } catch (err) {
         if (window.showAlert) window.showAlert("複製失敗，請手動複製。");
     }
     document.body.removeChild(ta);
