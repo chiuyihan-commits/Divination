@@ -38,7 +38,7 @@ window.silentAutoSaveRecord = async function () {
     }
 };
 
-// ★ 修正後的繪圖開關：切換時強迫底層重算，自動產出對應印章
+// ★ 修正後的繪圖開關：切換時強迫底層重算，自動產出對應印章，並控制提示詞顯示
 window.toggleDrawMode = function (isEnabled) {
     let changed = (AppState.isDrawModeEnabled !== isEnabled);
     AppState.isDrawModeEnabled = isEnabled;
@@ -67,6 +67,12 @@ window.toggleDrawMode = function (isEnabled) {
         }
 
         if (typeof window.renderRes === 'function') window.renderRes();
+
+        // ★ 新增：在 renderRes 重新渲染表頭之後，控制提示詞的顯示與隱藏
+        let drawTip = document.getElementById("ly-draw-tip");
+        if (drawTip) {
+            drawTip.style.display = isEnabled ? "block" : "none";
+        }
 
         // 切換開關後直接背景存檔
         if (typeof window.silentAutoSaveRecord === 'function') {
@@ -105,7 +111,15 @@ window.pro_getAdvancedYaoInfo = function (opts) {
         let isDPo = false, isAD = false, isKM = false;
 
         if (isDChong) {
-            if (isMoving) isKM = true;
+            if (isMoving) {
+                // ★ 修正：動爻休囚逢日沖，直接瓦解為「動而破」
+                if (score !== null && score < 0) {
+                    isKM = false;
+                    isDPo = true;
+                } else {
+                    isKM = true;
+                }
+            }
             else if (score !== null) {
                 if (score >= 0) isAD = true;
                 else isDPo = true;
@@ -190,8 +204,36 @@ window.pro_getAdvancedYaoInfo = function (opts) {
         let isDoubleHe = (isMHe && isDHe && !isZhiM && !isZhiRi);
 
         // ==========================================
-        // ★ 印章渲染輸出
+        // ★ 印章渲染輸出 (全域小印章升級版)
         // ==========================================
+        let bottomTags = [];
+
+        // ★ 新增：無敵鐵金剛判定 (包含失效條件)
+        let isInvincible = false;
+        if (!isBian && targetZ !== null) {
+            let isZhiM_inv = (targetZ === bazi.mZ);
+            let isZhiRi_inv = (targetZ === bazi.dZ);
+            let isMSheng_inv = (window.WuXingRels.sheng[elM] === elTgt);
+            let isMBi_inv = (elM === elTgt);
+            let isDSheng_inv = (window.WuXingRels.sheng[elD] === elTgt);
+            let isDBi_inv = (elD === elTgt);
+
+            if (isZhiM_inv && (isZhiRi_inv || isDSheng_inv || isDBi_inv)) isInvincible = true;
+            if (isZhiRi_inv && (isMSheng_inv || isMBi_inv)) isInvincible = true;
+
+            // 破局防呆：原局動爻若化回頭剋且帶沖，鐵金剛直接損毀
+            if (isInvincible && isMoving && zB !== undefined && zB !== null) {
+                let elB = ZhiFiveMap[zB];
+                if (Math.abs(targetZ - zB) === 6 && window.WuXingRels.ke[elB] === elTgt) {
+                    isInvincible = false;
+                }
+            }
+        }
+
+        if (isInvincible) {
+            bottomTags.push(renderSingle("無敵", "#d97706", "color:#fff; box-shadow:1px 1px 2px rgba(0,0,0,0.4); border:1px solid #fcd34d;", "", "無敵鐵金剛：高強生旺，原局不畏回頭剋"));
+        }
+
         if (isDoubleHe) {
             s += renderSingle("明合", "#0d6efd", "box-shadow: 1px 1px 2px rgba(0,0,0,0.2);", "", "日月雙合");
             isChongHe = false; isHeChong = false;
@@ -207,7 +249,6 @@ window.pro_getAdvancedYaoInfo = function (opts) {
         } else if (isChongHe || isHeChong) {
             let colC = chongZ !== null ? colorMap[ZhiFiveMap[chongZ]] : "#6f42c1";
             let colH = heZ !== null ? colorMap[ZhiFiveMap[heZ]] : "#0d6efd";
-
             let txtM = "", bgM = "", txtD = "", bgD = "";
 
             const getSrcName = (zId, action) => {
@@ -225,7 +266,6 @@ window.pro_getAdvancedYaoInfo = function (opts) {
             if (heZ === bazi.mZ) { txtM = "合"; bgM = colH; }
             else if (heZ === bazi.dZ) { txtD = "合"; bgD = colH; }
 
-            // ✅ 修正：精準分配動爻提供的沖合文字，避免重複
             if (!txtM) {
                 txtM = (txtD === "合" || (!txtD && isChongHe)) ? "沖" : "合";
                 bgM = (txtM === "沖") ? colC : colH;
@@ -237,27 +277,21 @@ window.pro_getAdvancedYaoInfo = function (opts) {
 
             let baziOrder = window.baziLayoutOrder || 'rtl';
             let chongType = isChongHe ? '沖中逢合' : '合處逢沖';
-
             let fullDesc = `${cDesc}、${hDesc} (${chongType})`;
             let titleAttr = `title="${chongType}" data-desc="${fullDesc}"`;
 
-            // ✅ 先宣告 dualStamp 變數，避免未定義錯誤
-            let dualStamp = "";
             if (baziOrder === 'rtl') {
-                dualStamp = `<span class="perfect-yinke-seal" ${titleAttr}><span style="background-color:${bgD}; color:#fff;">${txtD}</span><span style="background-color:${bgM}; color:#fff;">${txtM}</span></span>`;
+                s += `<span class="perfect-yinke-seal" ${titleAttr}><span style="background-color:${bgD}; color:#fff;">${txtD}</span><span style="background-color:${bgM}; color:#fff;">${txtM}</span></span>`;
             } else {
-                dualStamp = `<span class="perfect-yinke-seal" ${titleAttr}><span style="background-color:${bgM}; color:#fff;">${txtM}</span><span style="background-color:${bgD}; color:#fff;">${txtD}</span></span>`;
+                s += `<span class="perfect-yinke-seal" ${titleAttr}><span style="background-color:${bgM}; color:#fff;">${txtM}</span><span style="background-color:${bgD}; color:#fff;">${txtD}</span></span>`;
             }
 
-            // ✅ 判斷是否需要附加底部小印章
-            let extraTags = [];
-
+            // ★ 將所有沖合的額外狀態匯入 bottomTags
             if (isBian) {
-                // ★ 變爻：徹底回歸並讀取系統原本就算好的真破、假破、退盡、暗動判定！
                 if (isMPo && overrideM) {
                     let mStyle = overrideM === "真破" ? "color:#ffc107; background-color:#171717 !important; border:1px solid #333; box-shadow:0 0 6px rgba(220,53,69,0.5);" : "box-shadow: 1px 1px 2px rgba(0,0,0,0.2);";
                     let mCol = overrideM === "真破" ? "#171717" : colM;
-                    extraTags.push(renderSingle(overrideM, mCol, mStyle, "", "變爻月令狀態"));
+                    bottomTags.push(renderSingle(overrideM, mCol, mStyle, "", "變爻月令狀態"));
                 }
                 if (isDChong && overrideD) {
                     let dStyle = overrideD === "真破" ? "color:#ffc107; background-color:#171717 !important; border:1px solid #333; box-shadow:0 0 6px rgba(220,53,69,0.5);" : "box-shadow: 1px 1px 2px rgba(0,0,0,0.2);";
@@ -265,38 +299,24 @@ window.pro_getAdvancedYaoInfo = function (opts) {
                     if (overrideD === "真破") dCol = "#171717";
                     else if (overrideD === "暗動") dCol = "#6f42c1";
                     else if (overrideD === "退盡") dCol = "#6c757d";
-
-                    extraTags.push(renderSingle(overrideD, dCol, dStyle, "", "變爻日辰狀態"));
+                    bottomTags.push(renderSingle(overrideD, dCol, dStyle, "", "變爻日辰狀態"));
                 }
             } else {
-                // ★ 靜爻與動爻的專屬邏輯 (保留您精心設計的逢補與假破)
                 if (isHeChong && !isMoving) {
-                    // 靜爻合處逢沖
                     if (isDChong) {
-                        if (isAD) extraTags.push(renderSingle("暗動", "#6f42c1", "box-shadow: 1px 1px 2px rgba(0,0,0,0.2);", "", "氣數足，合處逢沖為暗動"));
-                        else if (isDPo) extraTags.push(renderSingle("日破", colD, "box-shadow: 1px 1px 2px rgba(0,0,0,0.2);", "", "氣數衰，合處逢沖為日破"));
+                        if (isAD) bottomTags.push(renderSingle("暗動", "#6f42c1", "box-shadow: 1px 1px 2px rgba(0,0,0,0.2);", "", "氣數足，合處逢沖為暗動"));
+                        else if (isDPo) bottomTags.push(renderSingle("日破", colD, "box-shadow: 1px 1px 2px rgba(0,0,0,0.2);", "", "氣數衰，合處逢沖為日破"));
                     }
                 } else if (isChongHe) {
                     if (!isMoving) {
-                        // 靜爻沖中逢合 (月破日合)
-                        if (isMPo && isDHe) extraTags.push(renderSingle("逢補", "#28a745", "box-shadow: 1px 1px 2px rgba(0,0,0,0.2);", "", "月破日合，沖中逢補"));
+                        if (isMPo && isDHe) bottomTags.push(renderSingle("逢補", "#28a745", "box-shadow: 1px 1px 2px rgba(0,0,0,0.2);", "", "月破日合，沖中逢補"));
                     } else {
-                        // 動爻沖中逢合 (月破日合)
-                        if (isMPo && isDHe) extraTags.push(renderSingle("假破", "#e6a23c", "box-shadow: 1px 1px 2px rgba(0,0,0,0.2);", "", "動爻月破日合，逢補為假破"));
+                        if (isMPo && isDHe) bottomTags.push(renderSingle("假破", "#e6a23c", "box-shadow: 1px 1px 2px rgba(0,0,0,0.2);", "", "動爻月破日合，逢補為假破"));
                     }
                 }
             }
-
-            // ✅ 將原本的 s += 改為判斷：有附加印章時，用 Flex 容器完美置中包覆
-            if (extraTags.length > 0) {
-                let tagsHtml = `<div style="display:flex; gap:3px; justify-content:center; margin-top:1px;">${extraTags.join("")}</div>`;
-                s += `<div style="display:inline-flex; flex-direction:column; gap:1px; align-items:center;">${dualStamp}${tagsHtml}</div>`;
-            } else {
-                s += dualStamp;
-            }
         } else {
-            let mTxt = null;
-            let dTxt = null;
+            let mTxt = null, dTxt = null;
 
             if (isZhiM) mTxt = overrideM || "月建";
             else if (isMPo) mTxt = overrideM || "月破";
@@ -335,18 +355,14 @@ window.pro_getAdvancedYaoInfo = function (opts) {
                 let baziOrder = window.baziLayoutOrder || 'rtl';
                 let fullDesc = `${mTxt}、${dTxt}`;
 
-                if (mShort === "建" && (dShort === "值" || dShort === "建")) {
-                    s += renderSingle("明值", colM, "box-shadow: 1px 1px 2px rgba(0,0,0,0.2);", "", "臨日月建(大旺)");
-                } else {
-                    if (mShort === "建") mShort = "建";
-                    if (mTxt === "激動") mShort = "激";
-                    if (dTxt === "激動") dShort = "激";
+                if (mShort === "建") mShort = "建";
+                if (mTxt === "激動") mShort = "激";
+                if (dTxt === "激動") dShort = "激";
 
-                    if (baziOrder === 'rtl') {
-                        s += `<span class="perfect-yinke-seal ${extCls}" data-desc="${fullDesc}"><span style="${dStyle}">${dShort}</span><span style="${mStyle}">${mShort}</span></span>`;
-                    } else {
-                        s += `<span class="perfect-yinke-seal ${extCls}" data-desc="${fullDesc}"><span style="${mStyle}">${mShort}</span><span style="${dStyle}">${dShort}</span></span>`;
-                    }
+                if (baziOrder === 'rtl') {
+                    s += `<span class="perfect-yinke-seal ${extCls}" data-desc="${fullDesc}"><span style="${dStyle}">${dShort}</span><span style="${mStyle}">${mShort}</span></span>`;
+                } else {
+                    s += `<span class="perfect-yinke-seal ${extCls}" data-desc="${fullDesc}"><span style="${mStyle}">${mShort}</span><span style="${dStyle}">${dShort}</span></span>`;
                 }
             }
             else if (mTxt) {
@@ -365,6 +381,12 @@ window.pro_getAdvancedYaoInfo = function (opts) {
 
                 s += renderSingle(displayTxt, bgCol, `box-shadow: 1px 1px 2px rgba(0,0,0,0.2); ${fontStyle}`, dTxt.includes("墓") ? dExtraClass : "", dTxt);
             }
+        }
+
+        // ✅ 終極排版引擎：所有標籤自動置中對齊貼合主印章下方
+        if (bottomTags.length > 0) {
+            let tagsHtml = `<div style="display:flex; gap:3px; justify-content:center; margin-top:1px;">${bottomTags.join("")}</div>`;
+            s = `<div style="display:inline-flex; flex-direction:column; gap:1px; align-items:center;">${s}${tagsHtml}</div>`;
         }
 
         let finalHtml = s;
@@ -416,8 +438,7 @@ window.pro_getAdvancedYaoInfo = function (opts) {
     }
     let fuStatus = mk(fZhiIdx, scoreF, false);
     let fuStatusHtml = fuStatus.html;
-    if (isFuOut) fuStatusHtml += `<span class="mark-break" style="background-color:#28a745; box-shadow: 1px 1px 2px rgba(0,0,0,0.2);">出伏</span>`;
-
+    
     // ==========================================
     // ★ 本卦分數計算 
     // ==========================================
@@ -754,6 +775,10 @@ window.pro_getAdvancedYaoInfo = function (opts) {
         else if (zbShengZ) bStatusObj.html += `<span class="mark-break" style="background-color:#198754;">回生</span>`;
 
         if (!fuIsHidden && fGZ && zB === fZhiIdx) bStatusObj.html += '<span class="mark-break" style="background-color:#20c997; letter-spacing:1px;">伏顯</span>';
+        
+    } else if (zB !== undefined && zB !== null) {
+        // ★ 修正：針對非變爻的變卦爻，統一呼叫底層計算，輸出進階小印章
+        bStatusObj = mk(zB, null, false, null, null, null, false);
     }
 
     // ==========================================
@@ -802,7 +827,6 @@ window.pro_getAdvancedYaoInfo = function (opts) {
         else if (window.WuXingRels.ke[elFu] === elTgt) {
             if (!isFuInjured && fuHasQi && (isFeiKong || isFeiHe || isFeiMuDay || isFeiPo || score < scoreF)) {
                 extraFuStamp += renderStamp("出暴", "#dc3545");
-                meetsGeneralChuFu = true;
             } else {
                 extraFuStamp += renderStamp("假暴", "#e6a23c");
             }
@@ -811,9 +835,8 @@ window.pro_getAdvancedYaoInfo = function (opts) {
         if (isMoving) {
             meetsGeneralChuFu = false;
         }
-
-        if (meetsGeneralChuFu && !isFuOut) {
-            isFuOut = true;
+        // ★ 統一使用進階理氣 (飛神空/破/墓/合，或飛伏生剋關係) 判定出伏
+        if (meetsGeneralChuFu) {
             fuStatusHtml += renderStamp("出伏", "#28a745");
         }
 
@@ -1367,57 +1390,6 @@ window.updateYaoHighlightsAndScore = function (idx, type, appData) {
         });
         return labels.join("、");
     };
-
-    // 第一層次：月建與日辰
-    let isMPo_tgt = Math.abs(zTgtIdx - mIdx) === 6;
-    let isDZhi_tgt = (zTgtIdx === dZhiIdx);
-
-    if (isMPo_tgt && isDZhi_tgt) {
-        currentScore += 0;
-        scoreDetails.push("月破值日(0)");
-    } else {
-        if (zTgtIdx === mIdx) { currentScore += 1; scoreDetails.push("值月(+1)"); }
-        else if (isMPo_tgt) { currentScore -= 1; scoreDetails.push("月破(-1)"); }
-        else if (mElIdx === elTgt || window.WuXingRels.sheng[mElIdx] === elTgt) {
-            currentScore += 1; scoreDetails.push(mElIdx === elTgt ? "月建比旺(+1)" : "月建生扶(+1)");
-        } else if (window.WuXingRels.ke[mElIdx] === elTgt) {
-            currentScore -= 1; scoreDetails.push("月建相剋(-1)");
-        } else {
-            scoreDetails.push("月建平相(+-0)");
-        }
-
-        if (isDZhi_tgt) { currentScore += 1; scoreDetails.push("值日(+1)"); }
-        else if (Math.abs(zTgtIdx - dZhiIdx) === 6) {
-            let isMv_tgt = (appData.rows[idx] && appData.rows[idx].move && appData.rows[idx].move !== "");
-            let isDayKe = window.WuXingRels.ke[dElIdx] === elTgt;
-
-            if (isMv_tgt) {
-                currentScore += 1;
-                scoreDetails.push("發動逢沖為快馬(+1)");
-            } else if (currentScore > 0) {
-                currentScore += 1;
-                scoreDetails.push("旺相逢沖為暗動(+1)");
-            } else if (currentScore < 0) {
-                currentScore -= 1;
-                scoreDetails.push("衰弱無氣為日破(-1)");
-            } else {
-                if (isDayKe) {
-                    currentScore -= 1;
-                    scoreDetails.push("平相逢日沖剋，受損(-1)");
-                } else {
-                    currentScore += 1;
-                    scoreDetails.push("平相逢沖不帶剋，激起為暗動(+1)");
-                }
-            }
-        }
-        else if (dElIdx === elTgt || window.WuXingRels.sheng[dElIdx] === elTgt) {
-            currentScore += 1; scoreDetails.push(dElIdx === elTgt ? "日辰比旺(+1)" : "日辰生扶(+1)");
-        } else if (window.WuXingRels.ke[dElIdx] === elTgt) {
-            currentScore -= 1; scoreDetails.push("日辰相剋(-1)");
-        } else {
-            scoreDetails.push("日辰平相(+-0)");
-        }
-    }
 
     // 第三層次：他爻 (動爻、暗動、出伏) 的生剋與動態應期
     if (type !== 'src' && type !== 'fu') {

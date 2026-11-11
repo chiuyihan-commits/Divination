@@ -49,6 +49,24 @@ window.recordCurrentHighlights = function () {
     // 已棄用，留空即可
 };
 
+// ==========================================
+// ★ 效能引擎：全域記憶體快取讀寫 (解決千筆資料存檔卡頓)
+// ==========================================
+window._globalRecsCache = null;
+
+window.getRecsFast = async function() {
+    if (window._globalRecsCache === null) {
+        window._globalRecsCache = await localforage.getItem('iching_final_v60') || [];
+    }
+    return window._globalRecsCache;
+};
+
+window.saveRecsFast = function(newRecs) {
+    window._globalRecsCache = newRecs;
+    // 不加 await！讓它在背景執行寫入硬碟，UI 瞬間完成無感
+    localforage.setItem('iching_final_v60', newRecs).catch(e => console.error("背景存檔失敗", e));
+};
+
 // 2. 建立 Proxy 代理器
 window.AppState = new Proxy(initialState, {
     set(target, property, value) {
@@ -254,6 +272,7 @@ window.loadRec = async function (i) {
     if (recView) {
         window.lastRecScrollPos = Math.max(recView.scrollTop, scrollY);
     }
+    
     // 2. 等待資料庫讀取完成 (這步有時間差，必須先做)
     let recs = await localforage.getItem('iching_final_v60') || [];
 
@@ -293,13 +312,31 @@ window.loadRec = async function (i) {
 
     // 7. 所有資料跟畫面都準備好後，最後才發送 Hash 切換給 Router！
     window.location.hash = "#result";
+
+    // ==========================================
+    // ★ 8. 歷史卦例自動升級機制 (版本號管理)
+    // ==========================================
+    const CURRENT_SNAPSHOT_VER = 1; // 👈 未來若介面或理氣引擎有大改，只需將此數字 +1 即可觸發全局舊卦升級
+
+    if (loadedData.snapshot_ver !== CURRENT_SNAPSHOT_VER) {
+        setTimeout(() => {
+            if (window.redrawAndSaveSnapshot) {
+                // 貼上最新渲染版本號，跟著快照一起存入資料庫
+                AppState.curData.snapshot_ver = CURRENT_SNAPSHOT_VER; 
+                
+                window.redrawAndSaveSnapshot();
+                console.log(`🔄 讀取完畢：已使用最新理則引擎重繪，快照升級至 v${CURRENT_SNAPSHOT_VER}！`);
+            }
+        }, 300);
+    } else {
+        console.log("⚡ 此卦例快照已是最新版本，跳過重繪，直接顯示！");
+    }
 };
 
 // ==========================================
-// ★ 歷史紀錄：列表渲染 (終極實體節點動態監聽版)
+// ★ 歷史紀錄：列表渲染 (滾動載入效能極致版)
 // ==========================================
 window.showRecords = async function (isReturning = false) {
-    // 1. 路由與畫面切換判斷
     if (!isReturning && window.location.hash !== "#records") {
         window.location.hash = "#records";
         return;
@@ -310,7 +347,6 @@ window.showRecords = async function (isReturning = false) {
     if (pView) pView.style.display = "none";
     if (rView) rView.style.display = "block";
 
-    // 2. 瞬間拉起大閘：注入太極動畫覆蓋層
     let container = document.getElementById("rec-list-container");
     if (container && !isReturning) {
         container.innerHTML = `
@@ -318,22 +354,19 @@ window.showRecords = async function (isReturning = false) {
                 <div class="taichi-spinner">☯</div>
                 <div class="records-loader-text">實體紀錄監聽中...</div>
             </div>
-            <div id="ly-real-data-pool" style="opacity: 0; transition: opacity 0.2s ease;"></div>
+            <div id="ly-real-data-pool" style="opacity: 0; transition: opacity 0.2s ease; padding-bottom: 20px;"></div>
+            <div id="ly-load-more-trigger" style="height: 20px;"></div>
         `;
-        await new Promise(r => setTimeout(r, 30));
     }
 
-    await new Promise(r => setTimeout(r, 30));
-
-    // 3. 從本機資料庫撈取紀錄
+    // 透過快取引擎極速拿資料
     let recs = [];
     try {
-        recs = await localforage.getItem('iching_final_v60') || [];
+        recs = typeof window.getRecsFast === 'function' ? await window.getRecsFast() : await localforage.getItem('iching_final_v60') || [];
     } catch (e) {
         console.error("資料庫讀取異常:", e);
     }
 
-    // 4. 精準空狀態判定
     if (recs.length === 0) {
         let gate = document.getElementById("ly-records-loading-gate");
         if (gate) gate.remove();
@@ -342,16 +375,71 @@ window.showRecords = async function (isReturning = false) {
                 <div style="text-align:center; padding:40px 20px; color:#999; animation: fadeIn 0.3s;">
                     <div style="font-size:3.5rem; margin-bottom:15px; opacity:0.6;">📭</div>
                     <div style="margin-bottom:20px; font-size:1.1rem; font-weight:bold;">目前確認暫無歷史紀錄</div>
-                    <button onclick="restoreFromCloud()" style="background:var(--blue-primary); color:#fff; border:none; padding:10px 24px; border-radius:6px; font-size:1.05rem; box-shadow:0 2px 4px rgba(0,0,0,0.2); cursor:pointer; font-weight:bold; transition:transform 0.1s;" onmousedown="this.style.transform='scale(0.95)'" onmouseup="this.style.transform='scale(1)'">☁️ 從雲端下載 / 還原紀錄</button>
+                    <button onclick="restoreFromCloud()" style="background:var(--blue-primary); color:#fff; border:none; padding:10px 24px; border-radius:6px; font-size:1.05rem; box-shadow:0 2px 4px rgba(0,0,0,0.2); cursor:pointer; font-weight:bold; transition:transform 0.1s;">☁️ 從雲端下載 / 還原紀錄</button>
                 </div>`;
         }
-        let hint = document.getElementById("scroll-hint");
-        if (hint) hint.style.display = 'none';
         return;
     }
 
-    // 5. 若有資料，先把 HTML 塞進隱藏的資料池
-    let h = `
+    let pool = document.getElementById("ly-real-data-pool");
+    const isMobile = window.innerWidth <= 768;
+    const CHUNK_SIZE = 25; // 每次只渲染 25 筆，保證流暢
+    window._currentRenderIndex = 0;
+
+    // 抽出渲染單筆卡片的邏輯
+    const renderChunk = () => {
+        if (!pool) return;
+        let h = "";
+        let endIdx = Math.min(window._currentRenderIndex + CHUNK_SIZE, recs.length);
+        
+        for (let i = window._currentRenderIndex; i < endIdx; i++) {
+            let r = recs[i];
+            let readClass = (i === window.activeRecHighlight) ? "read" : "unread";
+            let swipeEvents = isMobile ? `ontouchstart="handleSwipeStart(event, this, ${i})" ontouchmove="handleSwipeMove(event, this)" ontouchend="handleSwipeEnd(event, this)"` : "";
+
+            let displayTitle = r.subject || r.question || '無標題';
+            let titleHtml = "", guaNameDisplay = "", clickAction = "";
+
+            if (r.status === 'draft') {
+                titleHtml = `<span style="color: #ff9800; font-weight: bold; margin-right: 4px;">[草稿]</span> <span>${displayTitle}</span>`;
+                let stepCount = r.draftYaos ? r.draftYaos.filter(y => y !== "").length : 0;
+                guaNameDisplay = `⏳ 尚未成卦 (已完成 ${stepCount} 爻)`;
+                clickAction = `onclick="window.activeRecHighlight=${i}; if(!window.isSwiping) resumeDraft(${i})"`;
+            } else {
+                guaNameDisplay = r.ben.name;
+                if (r.bian && r.ben.name !== r.bian.name) guaNameDisplay = `${r.ben.name} ｜ ${r.bian.name}`;
+                let questionSub = (r.subject && r.question && r.subject !== r.question) ? `<span style="color:#888; font-size:0.82em; font-weight:normal; margin-left:8px;">(原問: ${r.question})</span>` : "";
+                titleHtml = r.subject ? `<span style="color: #888888; font-weight: bold; font-size: 1.05em; margin-right: 4px;">${r.subject}</span>${questionSub}` : `<span>${displayTitle}</span>`;
+                clickAction = `onclick="window.activeRecHighlight=${i}; if(!window.isSwiping) loadRec(${i})"`;
+            }
+
+            h += `
+            <div class="rec-item-wrap">
+                <div class="rec-content ${readClass}" ${clickAction} ${swipeEvents}>
+                    <div style="flex: 1;">
+                        <div style="font-weight:bold; font-size:1.1em; margin-bottom:4px; color:#333; display:flex; align-items:center; flex-wrap:wrap;">
+                            ${titleHtml}
+                        </div>
+                        <div style="font-size:0.9em; color:#666;">
+                            <span style="margin-right:10px;">${r.dateStr || "未記錄時間"}</span>
+                            <span style="color:${r.status === 'draft' ? '#ff9800' : 'var(--blue-primary)'}; font-weight:bold;">${guaNameDisplay}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="rec-actions">
+                    ${r.status !== 'draft' ? `<button style="background:#198754;" onclick="window.activeRecHighlight=${i}; editRecSetup(event,${i})">修改</button>` : `<button style="background:#6c757d; cursor:not-allowed;" disabled>修改</button>`}
+                    <button style="background:#dc3545;" onclick="deleteRecHistory(event, ${i})">刪除</button>
+                </div>
+            </div>`;
+        }
+        
+        // 將新產生的 HTML 附加到最後面，而非全部重繪
+        pool.insertAdjacentHTML('beforeend', h);
+        window._currentRenderIndex = endIdx;
+    };
+
+    // 初次渲染第一批
+    pool.innerHTML = `
     <style>
         .rec-item-wrap { position: relative; background: #eee; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 12px; display: flex; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden; }
         .rec-actions { display: flex; flex-direction: row; position: absolute; right: 0; top: 0; bottom: 0; width: 160px; z-index: 1; }
@@ -365,103 +453,28 @@ window.showRecords = async function (isReturning = false) {
             .rec-content { flex: 1; border-radius: 8px 0 0 8px; border-right: 1px solid #eee; transform: none !important; transition: none !important; }
         }
     </style>`;
-
-    const isMobile = window.innerWidth <= 768;
-
-    recs.forEach((r, i) => {
-        let readClass = (i === window.activeRecHighlight) ? "read" : "unread";
-        let swipeEvents = isMobile ? `ontouchstart="handleSwipeStart(event, this, ${i})" ontouchmove="handleSwipeMove(event, this)" ontouchend="handleSwipeEnd(event, this)"` : "";
-
-        let displayTitle = r.subject || r.question || '無標題';
-        let titleHtml = "";
-        let guaNameDisplay = "";
-        let clickAction = "";
-
-        // ★ 核心升級：判斷這筆紀錄是否為「草稿」
-        if (r.status === 'draft') {
-            titleHtml = `<span style="color: #ff9800; font-weight: bold; margin-right: 4px;">[草稿]</span> <span>${displayTitle}</span>`;
-            let stepCount = r.draftYaos ? r.draftYaos.filter(y => y !== "").length : 0;
-            guaNameDisplay = `⏳ 尚未成卦 (已完成 ${stepCount} 爻)`;
-            // 草稿的點擊事件：呼叫專屬的 resumeDraft 函數
-            clickAction = `onclick="window.activeRecHighlight=${i}; if(!window.isSwiping) resumeDraft(${i})"`;
-        } else {
-            // 已經成卦的正常紀錄
-            guaNameDisplay = r.ben.name;
-            if (r.bian && r.ben.name !== r.bian.name) guaNameDisplay = `${r.ben.name} ｜ ${r.bian.name}`;
-
-            let questionSub = (r.subject && r.question && r.subject !== r.question) ? `<span style="color:#888; font-size:0.82em; font-weight:normal; margin-left:8px;">(原問: ${r.question})</span>` : "";
-            titleHtml = r.subject
-                ? `<span style="color: #888888; font-weight: bold; font-size: 1.05em; margin-right: 4px;">${r.subject}</span>${questionSub}`
-                : `<span>${displayTitle}</span>`;
-
-            // 正常紀錄的點擊事件：呼叫原本的 loadRec 函數
-            clickAction = `onclick="window.activeRecHighlight=${i}; if(!window.isSwiping) loadRec(${i})"`;
-        }
-
-        h += `
-        <div class="rec-item-wrap">
-            <div class="rec-content ${readClass}" ${clickAction} ${swipeEvents}>
-                <div style="flex: 1;">
-                    <div style="font-weight:bold; font-size:1.1em; margin-bottom:4px; color:#333; display:flex; align-items:center; flex-wrap:wrap;">
-                        ${titleHtml}
-                    </div>
-                    <div style="font-size:0.9em; color:#666;">
-                        <span style="margin-right:10px;">${r.dateStr || "未記錄時間"}</span>
-                        <span style="color:${r.status === 'draft' ? '#ff9800' : 'var(--blue-primary)'}; font-weight:bold;">${guaNameDisplay}</span>
-                    </div>
-                </div>
-            </div>
-            <div class="rec-actions">
-                <!-- 草稿也可以直接刪除，但不能進入修改大表 -->
-                ${r.status !== 'draft' ? `<button style="background:#198754;" onclick="window.activeRecHighlight=${i}; editRecSetup(event,${i})">修改</button>` : `<button style="background:#6c757d; cursor:not-allowed;" disabled>修改</button>`}
-                <button style="background:#dc3545;" onclick="deleteRecHistory(event, ${i})">刪除</button>
-            </div>
-        </div>`;
-    });
-
-    let pool = document.getElementById("ly-real-data-pool");
-    if (!pool && container) {
-        container.innerHTML = `<div id="ly-real-data-pool" style="opacity: 0; transition: opacity 0.2s ease;"></div>`;
-        pool = document.getElementById("ly-real-data-pool");
-    }
-
-    // ★ 絕殺 1：鎖住容器高度，防止替換資料時高度瞬間塌陷
-    if (pool) {
-        let currentHeight = pool.scrollHeight;
-        if (currentHeight > 0) {
-            pool.style.minHeight = currentHeight + "px";
-        }
-
-        pool.innerHTML = h;
-
-        // 渲染完後解除高度鎖定
-        setTimeout(() => { pool.style.minHeight = ""; }, 850);
-    }
-
-    // 6. 動畫完美退場
-    await new Promise((resolve) => {
-        requestAnimationFrame(() => {
-            requestAnimationFrame(resolve);
-        });
-    });
+    renderChunk();
 
     let gate = document.getElementById("ly-records-loading-gate");
     if (gate) gate.remove();
-    if (pool) pool.style.opacity = "1";
+    pool.style.opacity = "1";
 
-    setTimeout(() => {
-        let hint = document.getElementById("scroll-hint");
-        if (rView && hint) {
-            if (rView.scrollHeight > rView.clientHeight) {
-                hint.style.display = 'flex';
-                hint.style.opacity = '1';
-                if (window.lyScrollTimeout) clearTimeout(window.lyScrollTimeout);
-                window.lyScrollTimeout = setTimeout(() => { hint.style.opacity = '0'; }, 1500);
-            } else {
-                hint.style.display = 'none';
+    // 建立交叉觀察者 (Intersection Observer)，當滑動到最底端時觸發下一批渲染
+    if (window._lyObserver) window._lyObserver.disconnect();
+    let trigger = document.getElementById("ly-load-more-trigger");
+    
+    if (trigger && 'IntersectionObserver' in window) {
+        window._lyObserver = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && window._currentRenderIndex < recs.length) {
+                renderChunk();
+                // 若正在搜尋狀態，新載入的內容也要套用過濾
+                if (document.getElementById("record-search-bar")?.style.display !== "none") {
+                    window.filterRecords(); 
+                }
             }
-        }
-    }, 50);
+        }, { root: rView, rootMargin: "100px" });
+        window._lyObserver.observe(trigger);
+    }
 };
 
 // ==========================================
@@ -591,7 +604,7 @@ async function saveRec() {
         return;
     }
 
-    let recs = await localforage.getItem('iching_final_v60') || [];
+    let recs = await window.getRecsFast();
 
     if (AppState.isDrawModeEnabled && typeof window.createDrawSnapshot === 'function') {
         AppState.curData.drawSnapshot = window.createDrawSnapshot();
@@ -658,7 +671,7 @@ async function saveRec() {
         window.renderHistoryLog();
     }
 
-    await localforage.setItem('iching_final_v60', recs);
+    window.saveRecsFast(recs);
 
     if (typeof window.syncToCloud === 'function') window.syncToCloud();
 
@@ -677,7 +690,7 @@ window.deleteRecHistory = function (event, i) {
 
     window.showConfirm("⚠️ 確定要將這筆紀錄移至回收桶嗎？\n(可在回收桶中還原或永久刪除)").then(async ok => {
         if (ok) {
-            let recs = await localforage.getItem('iching_final_v60') || [];
+            let recs = await window.getRecsFast();
             let trash = await localforage.getItem('iching_trash_v60') || [];
 
             let deletedItem = recs.splice(i, 1)[0];
@@ -688,7 +701,7 @@ window.deleteRecHistory = function (event, i) {
 
             trash.unshift(deletedItem);
 
-            await localforage.setItem('iching_final_v60', recs);
+            window.saveRecsFast(recs);
             await localforage.setItem('iching_trash_v60', trash);
 
             if (typeof showRecords === 'function') showRecords();
@@ -1673,7 +1686,7 @@ window.saveDraftToHistory = async function () {
         draftYaos.push(s ? s.value : "");
     }
 
-    let recs = await localforage.getItem('iching_final_v60') || [];
+    let recs = await window.getRecsFast();
 
     // 檢查全域是否有正在編輯的草稿 ID
     let draftId = window.currentDraftId || "draft_" + Date.now();
@@ -1698,7 +1711,7 @@ window.saveDraftToHistory = async function () {
         window.draftStartTime = draftObj.dateStr; // 鎖定起卦初始時間
     }
 
-    await localforage.setItem('iching_final_v60', recs);
+    window.saveRecsFast(recs);
 };
 
 // ==========================================

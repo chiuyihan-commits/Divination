@@ -586,7 +586,13 @@
                 </div>
 
                 <div class="edit-box">
-                    <label class="edit-label">主旨：</label>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <label class="edit-label" style="margin-bottom: 0;">主旨：</label>
+                        <label style="font-size: 0.85rem; color: #555; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                            <input type="checkbox" id="cb-export-subject" checked>
+                            圖片匯出主旨
+                        </label>
+                    </div>
                     <textarea id="edit-subject" class="edit-input edit-input-subject" placeholder="請輸入紀錄主旨..." rows="1"
                         style="font-weight: bold; color: #0d6efd; resize: none; overflow: hidden; padding-top: 8px; padding-bottom: 8px; line-height: 1.5;"
                         oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'"></textarea>
@@ -680,6 +686,11 @@
         <button id="drawer-btn-copy" onclick="history.back(); setTimeout(() => { window.copyResultAsText(); }, 150);"
             style="background: #6c757d; color: white; border: none; padding: 8px; border-radius: 6px; font-size: 0.9rem; font-weight: bold; cursor: pointer; margin-bottom: 10px; display: flex; align-items: center; justify-content: flex-start; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
             📋 複製排盤
+        </button>
+
+        <button id="drawer-btn-image" onclick="history.back(); setTimeout(() => { window.exportResultAsImage(); }, 150);"
+            style="background: #28a745; color: white; border: none; padding: 8px; border-radius: 6px; font-size: 0.9rem; font-weight: bold; cursor: pointer; margin-bottom: 10px; display: flex; align-items: center; justify-content: flex-start; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
+            🖼️ 匯出圖片
         </button>
 
         <button id="drawer-btn-upload" onclick="history.back(); setTimeout(() => { handleCloudBackup(); }, 150);"
@@ -1181,6 +1192,7 @@
 
                 let btnCal = document.getElementById('drawer-btn-calendar');
                 let btnCopy = document.getElementById('drawer-btn-copy');
+                let btnImage = document.getElementById('drawer-btn-image'); // ★ 新增這行
                 let btnUpload = document.getElementById('drawer-btn-upload');
                 let btnDownload = document.getElementById('drawer-btn-download');
 
@@ -1189,18 +1201,21 @@
                     // 歷史紀錄頁：只顯示備份、還原
                     if (btnCal) btnCal.style.display = 'none';
                     if (btnCopy) btnCopy.style.display = 'none';
+                    if (btnImage) btnImage.style.display = 'none'; // ★
                     if (btnUpload) btnUpload.style.display = 'flex';
                     if (btnDownload) btnDownload.style.display = 'flex';
                 } else if (mode === 'result') {
-                    // 卦盤解析頁：只顯示萬年曆、複製排盤
+                    // 卦盤解析頁：只顯示萬年曆、複製排盤、匯出圖片
                     if (btnCal) btnCal.style.display = 'flex';
                     if (btnCopy) btnCopy.style.display = 'flex';
+                    if (btnImage) btnImage.style.display = 'flex'; // ★
                     if (btnUpload) btnUpload.style.display = 'none';
                     if (btnDownload) btnDownload.style.display = 'none';
                 } else if (mode === 'home') {
-                    // ★ 首頁模式：顯示萬年曆、備份、還原 (不需要複製排盤)
+                    // 首頁模式：顯示萬年曆、備份、還原
                     if (btnCal) btnCal.style.display = 'flex';
                     if (btnCopy) btnCopy.style.display = 'none';
+                    if (btnImage) btnImage.style.display = 'none'; // ★
                     if (btnUpload) btnUpload.style.display = 'flex';
                     if (btnDownload) btnDownload.style.display = 'flex';
                 }

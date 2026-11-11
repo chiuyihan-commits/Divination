@@ -1032,9 +1032,12 @@ function solve(lines, bazi, najiaMode, fushenMode) {
         } else {
             // 完全由 ly_engine.js 獨立處理基礎印章
             myStatus = basicMk(z);
-            if (isMoving && zB !== undefined) {
+            
+            // ★ 修正：拔除 isMoving 限制，無論是否變爻，統一產生變卦的初階印章！
+            if (zB !== undefined && zB !== null) { 
                 bStatusObj = basicMk(zB);
             }
+            
             if (fGZ && !fuIsHidden) {
                 fuStatusHtml = basicMk(fZhiIdx).html;
             }
@@ -1491,17 +1494,17 @@ window.renderRes = function () {
 
     let html = "";
     if (isMobileMode) {
-        // ★ 新增「伏親」欄位
         document.querySelector(".gua-table thead").innerHTML = `<tr><th>伏親</th><th>伏神</th><th>六獸</th><th>本卦</th><th>六親</th><th>干支</th><th>變親</th><th>干支</th></tr>`;
     } else {
-        // ★ 電腦版也獨立抽出「伏親」
         document.querySelector(".gua-table thead").innerHTML = `<tr>
-            <th width="8%">六獸</th>
-            <th width="6%">伏親</th>
-            <th width="12%">伏神</th>
-            <th width="32%">【 本 卦 】(點干支看關係)</th>
-            <th width="8%">動爻</th>
-            <th width="34%">【 變 卦 】</th>
+            <th style="width: 8%;">【六獸】</th>
+            <th colspan="2" style="width: 16%;">【伏神】</th>
+            <th style="width: 32%;">
+                <div>【 本 卦 】</div>
+                <div id="ly-draw-tip" style="display: ${AppState.isDrawModeEnabled ? 'block' : 'none'}; font-size: 13px; color: #8ea1b5; font-weight: normal; margin-top: 2px;">(點干支看關係)</div>
+            </th>
+            <th style="width: 12%;">動爻</th>
+            <th style="width: 32%;">【 變 卦 】</th>
         </tr>`;
     }
 
@@ -1845,10 +1848,11 @@ window.renderRes = function () {
     // ===================================================
     let filterBar = document.getElementById("rel-filter-bar");
     let svgCanvas = document.getElementById("rel-svg");
-
+    let drawTip = document.getElementById("ly-draw-tip");
     if (AppState.isDrawModeEnabled) {
         if (filterBar) filterBar.style.display = "flex";
         if (svgCanvas) svgCanvas.style.display = "block";
+        if (drawTip) drawTip.style.display = "block"; // ★ 防呆：確保繪圖模式開啟時提示詞出現
 
         // 1. 如果有存過快照，就直接還原之前的樣貌
         if (AppState.curData.drawSnapshot && typeof window.restoreDrawSnapshot === 'function') {
@@ -1878,6 +1882,7 @@ window.renderRes = function () {
         }
     } else {
         if (filterBar) filterBar.style.display = "none";
+        if (drawTip) drawTip.style.display = "none"; // ★ 防呆：確保繪圖模式關閉時提示詞隱藏
         if (svgCanvas) {
             svgCanvas.style.display = "none";
             let relLines = document.getElementById("rel-lines");
@@ -1958,11 +1963,11 @@ window.enableNotesEdit = function (e) {
     else if (jEl) jEl.focus();
 };
 
-// ★ 排盤結果轉換為純文字複製功能 (最終對齊與設定連動版)
+// ==========================================
+// ★ 排盤結果轉換為純文字複製功能 (終極整合修正版 - 請放於 ly_engine.js 底部)
+// ==========================================
 window.copyResultAsText = function () {
-    // ==========================================
-    // ★ 複製前強制同步：抓取畫面上最新的輸入框內容
-    // ==========================================
+    // 1. 複製前強制同步：抓取畫面上最新的輸入框內容
     if (window.AppState && window.AppState.curData) {
         let curSubject = document.getElementById("edit-subject")?.value;
         if (curSubject !== undefined) {
@@ -1992,88 +1997,155 @@ window.copyResultAsText = function () {
         return;
     }
 
-    const padZW = (str, len) => {
-        let s = str || "";
-        while (s.length < len) s += " ";
-        return s;
-    };
+    // 2. 讀取「圖片/文字匯出主旨」Checkbox 開關
+    let cbExportSub = document.getElementById("cb-export-subject");
+    let shouldExportSubAndNotes = cbExportSub ? cbExportSub.checked : true;
 
+    // 3. 八字與神煞計算
     const ZhiList = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
     let k1_idx = (10 - d.bazi.dG + d.bazi.dZ) % 12; if (k1_idx < 0) k1_idx += 12;
     let k2_idx = (11 - d.bazi.dG + d.bazi.dZ) % 12; if (k2_idx < 0) k2_idx += 12;
-    let kongwang = ZhiList[k1_idx] + ZhiList[k2_idx];
+    
+    let yG = d.bazi.Y.charAt(0), yZ = d.bazi.Y.charAt(1);
+    let mG = d.bazi.M.charAt(0), mZ = d.bazi.M.charAt(1);
+    let dG = d.bazi.D.charAt(0), dZ = d.bazi.D.charAt(1);
+    let hG = d.bazi.H.charAt(0), hZ = d.bazi.H.charAt(1);
+
+    let kw1 = ZhiList[k1_idx], kw2 = ZhiList[k2_idx];
+    let hM = { 8: 2, 0: 2, 4: 2, 2: 8, 6: 8, 10: 8, 11: 5, 3: 5, 7: 5, 5: 11, 9: 11, 1: 11 };
+    let fM = { 8: 9, 0: 9, 4: 9, 2: 3, 6: 3, 10: 3, 11: 0, 3: 0, 7: 0, 5: 6, 9: 6, 1: 6 };
+    let gM = { 0: "丑未", 1: "子申", 2: "亥酉", 3: "亥酉", 4: "丑未", 5: "子申", 6: "丑未", 7: "午寅", 8: "卯巳", 9: "卯巳" };
+    let rM = { 0: 3, 1: 4, 2: 6, 3: 7, 4: 6, 5: 7, 6: 9, 7: 10, 8: 0, 9: 1 };
+    
+    let ma = ZhiList[hM[d.bazi.dZ]];
+    let hua = ZhiList[fM[d.bazi.dZ]];
+    let gui = gM[d.bazi.dG];
+    let ren = ZhiList[rM[d.bazi.dG]];
+
+    // ★ 純淨起卦方式 (徹底移除「六爻排盤APP」字樣)
+    let pureMethod = (d.method || "").slice(2) || "手動起卦";
+    let methodWithSub = pureMethod;
+    if (shouldExportSubAndNotes && d.subject && d.subject.trim()) {
+        methodWithSub += "：" + d.subject.trim();
+    }
+
+    // ★ 精準切割西元日期，防止「10年29日」Bug
+    let dateFmt = d.dateStr;
+    if (d.dateStr && d.dateStr.includes('/')) {
+        let dParts = d.dateStr.split(' ');
+        let ymd = dParts[0].split('/');
+        let timeStr = dParts[1] ? dParts[1] + "分" : "";
+        dateFmt = `${ymd[0]}年${ymd[1]}月${ymd[2]}日 ${timeStr}`;
+    }
+
+    const padFull = (str, targetLen) => {
+        let s = str || "";
+        while (s.length < targetLen) s += " ";
+        return s;
+    };
 
     let lines = [];
-    lines.push("【 ☯ 六爻排盤 ☯ 】");
-    if (d.question) lines.push(`占問事項：${d.question}`);
-    lines.push(`起卦時間：${d.dateStr} ${d.solarNote || ''}`);
-    lines.push(`起卦方式：${(d.method || "").slice(2) || "手動起卦"}`);
-    lines.push(`八字干支：${d.bazi.Y}年 ${d.bazi.M}月 ${d.bazi.D}日 ${d.bazi.H}時`);
-    lines.push(`當日空亡：${kongwang}`);
-    lines.push("");
+    
+    if (d.gender) lines.push(`性別：${d.gender}`);
+    lines.push(`西元 ${dateFmt}`);
+    lines.push(`納甲系統：${d.najia || "京房易之納甲法"}，伏神系統：${d.fushen || "王洪緒之《卜筮正宗》"}`);
+    
+    let gui1 = gui.charAt(0), gui2 = gui.length > 1 ? gui.charAt(1) : " ";
+    
+    // ★ 若有勾選帶入主旨且有主旨內容，採用防破版展開式標頭；否則採用方框標頭（皆不含 APP 贅字）
+    if (shouldExportSubAndNotes && d.subject && d.subject.trim()) {
+        lines.push(`起卦方式：${methodWithSub}`);
+        lines.push(`時日月年 空 驛 桃 貴 羊`);
+        lines.push(`     亡 馬 花 人 刃`);
+        lines.push(`${hG}${dG}${mG}${yG} ${kw1} ${ma} ${hua} ${gui1} ${ren}`);
+        lines.push(`${hZ}${dZ}${mZ}${yZ} ${kw2 ? kw2 : " "}     ${gui2}`);
+    } else {
+        lines.push(`┌─────────────────┐時日月年 空 驛 桃 貴 羊`);
+        let methodPad = padFull(pureMethod, 8);
+        lines.push(`│ 起卦方式：${methodPad} │    亡 馬 花 人 刃`);
+        lines.push(`│                 │${hG}${dG}${mG}${yG} ${kw1} ${ma} ${hua} ${gui1} ${ren}`);
+        lines.push(`└─────────────────┘${hZ}${dZ}${mZ}${yZ} ${kw2 ? kw2 : " "}     ${gui2}`);
+    }
 
     const getShiStr = (name, shi) => {
         if (shi === 6) return "八純卦";
         return ['', '一', '二', '三', '四', '五', '八純'][shi] + '世卦';
     };
 
-    let isGuaChanged = d.ben.name !== d.bian.name;
-    if (isGuaChanged) {
-        lines.push(`【本卦】${d.ben.gong}宮 ${getShiStr(d.ben.name, d.ben.shi)}：${d.ben.name} → 【變卦】${d.bian.gong}宮 ${getShiStr(d.bian.name, d.bian.shi)}：${d.bian.name}`);
+    let benGong = d.ben.gong;
+    let benEl = GuaElMap[benGong];
+    let bianGong = d.bian.gong;
+    let bianEl = GuaElMap[bianGong];
+
+    let hasMoving = d.rows.some(r => r.move && r.move !== "");
+    let benGuaTitle = padFull(`${benGong}${benEl}${getShiStr(d.ben.name, d.ben.shi)}：${d.ben.name}`, 12);
+    
+    lines.push(` `);
+    if (hasMoving) {
+        let bianGuaTitle = `${bianGong}${bianEl}${getShiStr(d.bian.name, d.bian.shi)}：${d.bian.name}`;
+        lines.push(`        ${benGuaTitle}     ${bianGuaTitle}`);
     } else {
-        lines.push(`【本卦】${d.ben.gong}宮 ${getShiStr(d.ben.name, d.ben.shi)}：${d.ben.name}`);
+        // 無變爻時，右側鏡像本卦標題
+        lines.push(`        ${benGuaTitle}     ${benGuaTitle}`);
     }
-    lines.push("");
+    lines.push(` `);
+    
+    lines.push(`【爻位】【六獸】【伏  神】 【 本  卦 】       【 變  卦 】`);
 
-    lines.push("伏  神 六獸 【本  卦】     【變  卦】");
-
-    // ★ 抓取目前的 UI 設定：僅顯動爻 (move) 或 全顯變爻 (all)
     let bianViewMode = document.getElementById('res-set-bian') ? document.getElementById('res-set-bian').value : "move";
+    let yaoNames = ['六爻', '五爻', '四爻', '三爻', '二爻', '初爻'];
 
-    // ★ 核心修正：從 rows[0] (上爻) 往下印到 rows[5] (初爻)，確保不會頭下腳上！
+    // ★ 嚴格由上往下：i = 0 (rows[0] = 六爻) 到 i = 5 (rows[5] = 初爻)
     for (let i = 0; i <= 5; i++) {
         let r = d.rows[i];
+        let yName = yaoNames[i]; 
+        
+        let bst = r.bst;
+        let fuStr = r.fuGz ? padFull(r.fuRel.substr(0, 2) + r.fuGz, 5) : "     ";
+        
+        let shiYing = r.shi ? r.shi : " ";
+        let rel = padFull(r.rel.substr(0, 2), 2);
+        let yaoSym = (r.bar === "solid") ? "█████" : "██ ██";
+        let gz = padFull(r.gz, 3);
 
-        let fuStr = padZW(r.fuGz ? (r.fuRel.substr(0, 2) + r.fuGz) : "", 5);
-        let bst = padZW(r.bst, 2);
-
-        let shiStr = r.shi ? r.shi : " ";
-        let relFull = r.rel || "";
-        if (relFull.length <= 2 && r.gz) relFull += r.gz;
-        let benStr = padZW(shiStr + relFull, 6);
-
-        let yaoSym = (r.bar === "solid") ? "━━━" : "━ ━";
-        let moveSym = r.move ? (r.move.includes("O") ? "○" : "✕") : " ";
-        let centerStr = `${yaoSym} ${moveSym}`;
-
-        // ★ 變卦顯示邏輯連動：若無變卦或選擇不顯示，就維持乾淨的空白
-        let bianStr = "";
-        if (isGuaChanged) {
+        let moveSym = "    ";
+        let bianStr = "            "; 
+        
+        if (hasMoving) {
+            if (r.move) {
+                moveSym = r.move.includes("O") ? "○──→" : "╳──→";
+            }
             let shouldShowBian = (bianViewMode === "all" || r.move);
             if (shouldShowBian && r.bgz) {
-                let bShiStr = r.bShi ? r.bShi : " ";
-                let brFull = r.br || "";
-                if (brFull.length <= 2 && r.bgz) brFull += r.bgz;
-                bianStr = `→ ${bShiStr}${brFull}`;
-            } else {
-                bianStr = `       `; // 隱藏變卦時保持寬度
+                let bGz = padFull(r.bgz, 3);
+                let bRel = padFull(r.br.substr(0, 2), 2);
+                let bYaoSym = (r.bbar === "solid") ? "█████" : "██ ██";
+                let bShiYing = r.bShi ? r.bShi : " ";
+                bianStr = `${bGz} ${bRel}${bYaoSym}${bShiYing}${bRel}`;
             }
+        } else {
+            // 無變爻時，完整鏡像本卦資訊
+            let bGz = padFull(r.gz, 3);
+            let bRel = padFull(r.rel.substr(0, 2), 2);
+            let bYaoSym = (r.bar === "solid") ? "█████" : "██ ██";
+            let bShiYing = r.shi ? r.shi : " ";
+            bianStr = `${bGz} ${bRel}${bYaoSym}${bShiYing}${bRel}`;
         }
 
-        lines.push(`${fuStr} ${bst} ${benStr} ${centerStr} ${bianStr}`);
+        lines.push(` ${yName}  ${bst} ${fuStr} ${shiYing}${rel}${yaoSym}${gz} ${moveSym} ${bianStr}`);
     }
     lines.push("");
-    lines.push("------------------------------");
-    lines.push("");
 
-    // ★ 根據文字內容決定是否加入複製內容 (有輸入文字才會顯示)
-    if (d.copyAddon && d.copyAddon.trim()) lines.push(`【注意】\n${d.copyAddon.trim()}\n`);
-    if (d.currentStatus && d.currentStatus.trim()) lines.push(`【現況說明】\n${d.currentStatus.trim()}\n`);
-    if (d.judge && d.judge.trim()) lines.push(`【占斷結果】\n${d.judge.trim()}\n`);
-    if (d.feedback && d.feedback.trim()) lines.push(`【事後回饋】\n${d.feedback.trim()}\n`);
-    if (d.note && d.note.trim()) lines.push(`【備註】\n${d.note.trim()}\n`);
+    // ★ 若勾選匯出主旨，才一併帶入下方筆記與注意
+    if (shouldExportSubAndNotes) {
+        if (d.copyAddon && d.copyAddon.trim()) lines.push(`【注意】\n${d.copyAddon.trim()}\n`);
+        if (d.currentStatus && d.currentStatus.trim()) lines.push(`【現況說明】\n${d.currentStatus.trim()}\n`);
+        if (d.judge && d.judge.trim()) lines.push(`【占斷結果】\n${d.judge.trim()}\n`);
+        if (d.feedback && d.feedback.trim()) lines.push(`【事後回饋】\n${d.feedback.trim()}\n`);
+        if (d.note && d.note.trim()) lines.push(`【備註】\n${d.note.trim()}\n`);
+    }
 
-    let finalTxt = lines.join("\n").trim(); // 去除尾部多餘換行
+    let finalTxt = lines.join("\n").trim();
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(finalTxt).then(() => {
@@ -2085,6 +2157,419 @@ window.copyResultAsText = function () {
     } else {
         fallbackCopyTextToClipboard(finalTxt);
     }
+};
+
+// ==========================================
+// ★ 卦盤匯出為命理網風格圖片功能 (終極整合修正版 - 請放於 ly_engine.js 底部)
+// ==========================================
+window.exportResultAsImage = function() {
+    let d = window.AppState.curData;
+    if (!d || !d.lines) {
+        if (window.showToast) window.showToast("⚠️ 沒有可輸出的排盤資料！");
+        return;
+    }
+
+    // 同步畫面最新主旨
+    if (window.AppState && window.AppState.curData) {
+        let curSubject = document.getElementById("edit-subject")?.value;
+        if (curSubject !== undefined) {
+            window.AppState.curData.question = curSubject;
+            window.AppState.curData.subject = curSubject;
+        }
+    }
+
+    const fontNormal = '18px "標楷體", "BiauKai", "DFKai-SB", "Kaiti TC", "KaiTi", "楷体", serif';
+    const fontSmall = '14px "標楷體", "BiauKai", "DFKai-SB", "Kaiti TC", "KaiTi", "楷体", serif';
+
+    // ==========================================
+    // ★ 1. 前置運算：主旨自動換行與動態高度計算
+    // ==========================================
+    let methodStr = (d.method || "").slice(2) || "電腦起卦";
+    let cbExportSub = document.getElementById("cb-export-subject");
+    if (cbExportSub && cbExportSub.checked && d.subject && d.subject.trim()) {
+        methodStr += "：" + d.subject.trim();
+    }
+
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.font = fontNormal;
+
+    let maxMethodWidth = 390; 
+    let words = (" " + methodStr).split('');
+    let tempLine = '';
+    let linesToDraw = [];
+    
+    for (let n = 0; n < words.length; n++) {
+        let testLine = tempLine + words[n];
+        if (tempCtx.measureText(testLine).width > maxMethodWidth && n > 0) {
+            linesToDraw.push(tempLine);
+            tempLine = " " + words[n]; 
+        } else {
+            tempLine = testLine;
+        }
+    }
+    linesToDraw.push(tempLine);
+
+    let dynamicOffset = Math.max(0, (linesToDraw.length - 1) * 25);
+
+    // ==========================================
+    // ★ 2. 建立真實 Canvas (套用動態高度)
+    // ==========================================
+    const scale = 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = 860 * scale;
+    canvas.height = (430 + dynamicOffset) * scale; 
+    const ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 860, 430 + dynamicOffset);
+    ctx.font = fontNormal;
+
+    // 左上角基本資訊框
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    let boxHeight = 70 + dynamicOffset;
+    ctx.strokeRect(10, 10, 440, boxHeight);
+
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'start'; 
+    
+    ctx.fillStyle = d.gender === "女" ? '#cc0000' : '#0000ff';
+    ctx.fillText(d.gender || "男", 20, 30);
+    
+    ctx.fillStyle = '#000000';
+    let startY = 30;
+    let lineHeight = 25;
+    for (let i = 0; i < linesToDraw.length; i++) {
+        ctx.fillText(linesToDraw[i], 40, startY + (i * lineHeight));
+    }
+
+    // ★ 精準切割西元日期，解決「11年9日」Bug
+    let dateFmt = d.dateStr;
+    if (d.dateStr && d.dateStr.includes('/')) {
+        let dParts = d.dateStr.split(' ');
+        let ymd = dParts[0].split('/');
+        let timeStr = dParts[1] ? dParts[1] + "分" : "";
+        dateFmt = `${ymd[0]}年${ymd[1]}月${ymd[2]}日  ${timeStr}`;
+    }
+
+    ctx.fillText("於 西元  " + dateFmt, 20, 60 + dynamicOffset);
+
+    // ==========================================
+    // ★ 3. 右上角四柱與神煞 (絕對置中對齊 + 四柱全紅字)
+    // ==========================================
+    ctx.textAlign = 'center'; 
+    
+    let bzStartX = 479; 
+    let bzStartY = 20;
+    let colSpace = 28;
+    
+    ctx.fillStyle = '#000000';
+    ctx.fillText("時", bzStartX, bzStartY);
+    ctx.fillText("日", bzStartX + colSpace, bzStartY);
+    ctx.fillText("月", bzStartX + colSpace * 2, bzStartY);
+    ctx.fillText("年", bzStartX + colSpace * 3, bzStartY);
+    
+    let yG = d.bazi.Y.charAt(0), yZ = d.bazi.Y.charAt(1);
+    let mG = d.bazi.M.charAt(0), mZ = d.bazi.M.charAt(1);
+    let dG = d.bazi.D.charAt(0), dZ = d.bazi.D.charAt(1);
+    let hG = d.bazi.H.charAt(0), hZ = d.bazi.H.charAt(1);
+
+    // ★ 四柱天干與地支統一為紅色 (#cc0000)
+    ctx.fillStyle = '#cc0000'; 
+    ctx.fillText(hG, bzStartX, bzStartY + 25);
+    ctx.fillText(dG, bzStartX + colSpace, bzStartY + 25);
+    ctx.fillText(mG, bzStartX + colSpace * 2, bzStartY + 25);
+    ctx.fillText(yG, bzStartX + colSpace * 3, bzStartY + 25);
+
+    ctx.fillText(hZ, bzStartX, bzStartY + 48);
+    ctx.fillText(dZ, bzStartX + colSpace, bzStartY + 48);
+    ctx.fillText(mZ, bzStartX + colSpace * 2, bzStartY + 48);
+    ctx.fillText(yZ, bzStartX + colSpace * 3, bzStartY + 48);
+
+    const ZhiList = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
+    let k1_idx = (10 - d.bazi.dG + d.bazi.dZ) % 12; if (k1_idx < 0) k1_idx += 12;
+    let k2_idx = (11 - d.bazi.dG + d.bazi.dZ) % 12; if (k2_idx < 0) k2_idx += 12;
+    let kw1 = ZhiList[k1_idx], kw2 = ZhiList[k2_idx];
+    
+    let hM = { 8: 2, 0: 2, 4: 2, 2: 8, 6: 8, 10: 8, 11: 5, 3: 5, 7: 5, 5: 11, 9: 11, 1: 11 };
+    let fM = { 8: 9, 0: 9, 4: 9, 2: 3, 6: 3, 10: 3, 11: 0, 3: 0, 7: 0, 5: 6, 9: 6, 1: 6 };
+    let gM = { 0: "丑未", 1: "子申", 2: "亥酉", 3: "亥酉", 4: "丑未", 5: "子申", 6: "丑未", 7: "午寅", 8: "卯巳", 9: "卯巳" };
+    let rM = { 0: 3, 1: 4, 2: 6, 3: 7, 4: 6, 5: 7, 6: 9, 7: 10, 8: 0, 9: 1 };
+    
+    let ma = ZhiList[hM[d.bazi.dZ]];
+    let hua = ZhiList[fM[d.bazi.dZ]];
+    let gui = gM[d.bazi.dG];
+    let gui1 = gui.charAt(0), gui2 = gui.length > 1 ? gui.charAt(1) : "";
+    let ren = ZhiList[rM[d.bazi.dG]];
+
+    let ssStartX = 609; 
+    const ssTitlesTop = ["空", "驛", "桃", "貴", "羊"];
+    const ssTitlesBot = ["亡", "馬", "花", "人", "刃"];
+    const ssOffsets   = [0, 36, 72, 108, 144]; 
+
+    ctx.fillStyle = '#000000';
+    for (let i = 0; i < 5; i++) {
+        ctx.fillText(ssTitlesTop[i], ssStartX + ssOffsets[i], bzStartY - 10);
+        ctx.fillText(ssTitlesBot[i], ssStartX + ssOffsets[i], bzStartY + 10);
+    }
+    
+    ctx.fillStyle = '#cc0000';
+    ctx.fillText(kw1, ssStartX + ssOffsets[0], bzStartY + 32);
+    if (kw2) ctx.fillText(kw2, ssStartX + ssOffsets[0], bzStartY + 54);
+    ctx.fillText(ma, ssStartX + ssOffsets[1], bzStartY + 32);
+    ctx.fillText(hua, ssStartX + ssOffsets[2], bzStartY + 32);
+    ctx.fillText(gui1, ssStartX + ssOffsets[3], bzStartY + 32);
+    if(gui2) ctx.fillText(gui2, ssStartX + ssOffsets[3], bzStartY + 54);
+    ctx.fillText(ren, ssStartX + ssOffsets[4], bzStartY + 32);
+
+    // ==========================================
+    // ★ 4. 卦名與表頭 (統一使用絕對中心座標，跨裝置零誤差)
+    // ==========================================
+    const getShiStr = (name, shi) => {
+        if (shi === 6) return "本宮";
+        return ['', '一', '二', '三', '四', '五', '本宮'][shi] + (shi === 6 ? '' : '世');
+    };
+    ctx.fillStyle = '#000000';
+    
+    let benGong = d.ben.gong;
+    let benEl = GuaElMap[benGong];
+    let bianGong = d.bian.gong;
+    let bianEl = GuaElMap[bianGong];
+    let hasMoving = d.rows.some(r => r.move && r.move !== "");
+
+    let colCenter_Beast = 40;
+    let colCenter_Fu    = 135;
+    let colCenter_Ben   = 320;
+    let colCenter_Bian  = 645;
+
+    let guaNameY = 105 + dynamicOffset;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${benGong}${benEl}${getShiStr(d.ben.name, d.ben.shi)}：${d.ben.name}`, colCenter_Ben, guaNameY);
+    if (hasMoving) {
+        ctx.fillText(`${bianGong}${bianEl}${getShiStr(d.bian.name, d.bian.shi)}：${d.bian.name}`, colCenter_Bian, guaNameY);
+    } else {
+        ctx.fillText(`${benGong}${benEl}${getShiStr(d.ben.name, d.ben.shi)}：${d.ben.name}`, colCenter_Bian, guaNameY);
+    }
+
+    let headerY = 140 + dynamicOffset;
+    ctx.fillText("【六獸】", colCenter_Beast, headerY);
+    ctx.fillText("【伏 神】", colCenter_Fu, headerY);
+    ctx.fillText("【 本 卦 】", colCenter_Ben, headerY);
+    ctx.fillText("【 變 卦 】", colCenter_Bian, headerY);
+
+    // ==========================================
+    // ★ 5. 爻列排版 (嚴格 i = 0 六爻在最上 -> i = 5 初爻在最下)
+    // ==========================================
+    let rowY = 175 + dynamicOffset;
+    let rowSpacing = 42;
+    
+    const drawYaoBar = (centerX, y, isSolid) => {
+        ctx.fillStyle = '#000000';
+        if (isSolid) {
+            ctx.fillRect(centerX - 32, y - 2, 64, 20);
+        } else {
+            ctx.fillRect(centerX - 32, y - 2, 26, 20);
+            ctx.fillRect(centerX + 6, y - 2, 26, 20);
+        }
+    };
+
+    let bianViewMode = document.getElementById('res-set-bian') ? document.getElementById('res-set-bian').value : "move";
+    
+    // ★ 直接以八字底層地支精算「空、破、沖」，不依賴受繪圖開關影響的 HTML 字串
+    const getPureTags = (gzStr) => {
+        if (!gzStr || gzStr.length < 2) return [];
+        let zIdx = ZhiList.indexOf(gzStr.charAt(1));
+        if (zIdx === -1) return [];
+        
+        let isKong = (zIdx === k1_idx || zIdx === k2_idx);
+        let isMPo = (Math.abs(zIdx - d.bazi.mZ) === 6);
+        let isDChong = (Math.abs(zIdx - d.bazi.dZ) === 6);
+        
+        // ★ 圖片匯出專用：短字版
+        let tags = [];
+        if (isDChong && isMPo) tags.push("沖破");
+        else if (isMPo) tags.push("破");
+        else if (isDChong) tags.push("沖");
+        if (isKong) tags.push("空");
+        return tags;
+    };
+
+    for (let i = 0; i <= 5; i++) {
+        let r = d.rows[i];
+        
+        ctx.fillStyle = '#000000';
+        ctx.font = fontNormal;
+        
+        // 1. 六獸
+        ctx.textAlign = 'center';
+        ctx.fillText(r.bst, colCenter_Beast, rowY);
+        
+        // 2. 伏神 (天干黑、地支五行藍 + 下方空破沖)
+        if (r.fuGz) {
+            let fuStrBlack = r.fuRel.substr(0,2) + r.fuGz.charAt(0); 
+            let fuStrBlue = r.fuGz.substring(1); 
+            
+            let blackW = ctx.measureText(fuStrBlack).width;
+            let blueW = ctx.measureText(fuStrBlue).width;
+            let startX = colCenter_Fu - ((blackW + blueW) / 2);
+            
+            ctx.textAlign = 'start';
+            ctx.fillStyle = '#000000';
+            ctx.fillText(fuStrBlack, startX, rowY);
+            ctx.fillStyle = '#0000ff';
+            ctx.fillText(fuStrBlue, startX + blackW, rowY);
+            
+            let fTags = getPureTags(r.fuGz);
+            if (fTags.length > 0) {
+                ctx.textAlign = 'center';
+                ctx.fillStyle = '#ff6b6b'; 
+                ctx.font = fontSmall;
+                ctx.fillText(fTags.join(" "), startX + blackW + (blueW / 2), rowY + 18);
+                ctx.font = fontNormal;
+            }
+        }
+
+        // 3. 本卦
+        ctx.textAlign = 'center';
+        if (r.shi) {
+            ctx.fillStyle = '#cc0000';
+            ctx.fillText(r.shi, colCenter_Ben - 85, rowY);
+        }
+        
+        ctx.fillStyle = '#000000';
+        ctx.fillText(r.rel.substr(0,2), colCenter_Ben - 50, rowY);
+        
+        drawYaoBar(colCenter_Ben + 10, rowY - 8, r.bar === "solid");
+
+        ctx.textAlign = 'start';
+        let benGzStartX = colCenter_Ben + 50;
+        let benGanStr = r.gz.charAt(0);
+        let benZhiWxStr = r.gz.substring(1);
+        let benGanW = ctx.measureText(benGanStr).width;
+        let benZhiW = ctx.measureText(benZhiWxStr).width;
+
+        ctx.fillStyle = '#000000';
+        ctx.fillText(benGanStr, benGzStartX, rowY);
+        ctx.fillStyle = '#0000ff';
+        ctx.fillText(benZhiWxStr, benGzStartX + benGanW, rowY);
+        
+        let benTags = getPureTags(r.gz);
+        if (benTags.length > 0) {
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ff6b6b'; 
+            ctx.font = fontSmall;
+            ctx.fillText(benTags.join(" "), benGzStartX + benGanW + (benZhiW / 2), rowY + 18);
+            ctx.font = fontNormal;
+        }
+
+        // 4. 動爻與變卦資料準備
+        let bGz = "", bRel = "", bBar = "", bShi = "";
+        let shouldShowBian = false;
+
+        if (hasMoving) {
+            if (r.move) {
+                ctx.strokeStyle = '#cc0000';
+                ctx.lineWidth = 3;
+                let moveX = colCenter_Ben + 125; 
+                if (r.move.includes("O")) {
+                    ctx.beginPath();
+                    ctx.arc(moveX, rowY, 8, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.moveTo(moveX - 8, rowY - 8); ctx.lineTo(moveX + 8, rowY + 8);
+                    ctx.moveTo(moveX + 8, rowY - 8); ctx.lineTo(moveX - 8, rowY + 8);
+                    ctx.stroke();
+                }
+                
+                ctx.beginPath();
+                ctx.moveTo(moveX + 16, rowY);
+                ctx.lineTo(moveX + 72, rowY);
+                ctx.lineTo(moveX + 62, rowY - 6);
+                ctx.moveTo(moveX + 72, rowY);
+                ctx.lineTo(moveX + 62, rowY + 6);
+                ctx.stroke();
+            }
+
+            shouldShowBian = (bianViewMode === "all" || r.move);
+            if (shouldShowBian && r.bgz) {
+                bGz = r.bgz;
+                bRel = r.br;
+                bBar = r.bbar;
+                bShi = r.bShi;
+            }
+        } else {
+            // 無變爻時，完整複製本卦資料鏡像至右側
+            bGz = r.gz;
+            bRel = r.rel;
+            bBar = r.bar;
+            bShi = r.shi;
+            shouldShowBian = true; 
+        }
+
+        // 5. 繪製右側變卦 (包含全顯變爻時非動爻的空破沖標籤)
+        if (shouldShowBian && bGz) {
+            ctx.textAlign = 'start';
+            let bianGzStartX = colCenter_Bian - 115;
+            let bGanStr = bGz.charAt(0);
+            let bZhiWxStr = bGz.substring(1);
+            let bGanW = ctx.measureText(bGanStr).width;
+            let bZhiW = ctx.measureText(bZhiWxStr).width;
+
+            ctx.fillStyle = '#000000';
+            ctx.fillText(bGanStr, bianGzStartX, rowY);
+            ctx.fillStyle = '#0000ff';
+            ctx.fillText(bZhiWxStr, bianGzStartX + bGanW, rowY);
+
+            let bTags = getPureTags(bGz);
+            if (bTags.length > 0) {
+                ctx.textAlign = 'center';
+                ctx.fillStyle = '#ff6b6b';
+                ctx.font = fontSmall;
+                ctx.fillText(bTags.join(" "), bianGzStartX + bGanW + (bZhiW / 2), rowY + 18);
+                ctx.font = fontNormal;
+            }
+
+            ctx.textAlign = 'center';
+            if (bRel) {
+                ctx.fillStyle = '#000000';
+                ctx.fillText(bRel.substr(0,2), colCenter_Bian - 30, rowY);
+            }
+
+            if (bBar) {
+                drawYaoBar(colCenter_Bian + 30, rowY - 8, bBar === "solid");
+            }
+
+            if (bShi) {
+                ctx.fillStyle = '#cc0000';
+                ctx.fillText(bShi, colCenter_Bian + 80, rowY);
+            }
+
+            if (bRel) {
+                ctx.fillStyle = '#000000';
+                ctx.fillText(bRel.substr(0,2), colCenter_Bian + 115, rowY);
+            }
+        }
+
+        rowY += rowSpacing;
+    }
+
+    let subjectStr = (d.subject || d.question || "").trim();
+    if (!subjectStr) subjectStr = "未命名";
+    let dateStrClean = d.dateStr.replace(/[: \/]/g, ''); 
+    let fileName = `卦盤_${dateStrClean}_${subjectStr}.png`;
+
+    const dataUrl = canvas.toDataURL("image/png");
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    if (window.showToast) window.showToast("🖼️ 圖片已成功產生並下載！");
 };
 
 // 傳統剪貼簿降級方案
